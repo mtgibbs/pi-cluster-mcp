@@ -1,0 +1,44 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-homelab
+  labels:
+    app.kubernetes.io/name: mcp-homelab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mcp-homelab
+subjects:
+  - kind: ServiceAccount
+    name: mcp-homelab
+    namespace: mcp-homelab
+---
+# Restrict pod/exec to jellyfin namespace only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mcp-homelab-jellyfin-exec
+  namespace: jellyfin
+  labels:
+    app.kubernetes.io/name: mcp-homelab
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods/exec
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mcp-homelab-jellyfin-exec
+  namespace: jellyfin
+  labels:
+    app.kubernetes.io/name: mcp-homelab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcp-homelab-jellyfin-exec
+subjects:
+  - kind: ServiceAccount
+    name: mcp-homelab
+    namespace: mcp-homelab
