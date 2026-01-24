@@ -1,4 +1,5 @@
 import * as k8s from '@kubernetes/client-node';
+import { PassThrough } from 'stream';
 
 let coreApi: k8s.CoreV1Api;
 let appsApi: k8s.AppsV1Api;
@@ -100,4 +101,57 @@ export async function getCustomResource(
   }
   const response = await api.listClusterCustomObject(group, version, plural);
   return response.body;
+}
+
+export async function execInPod(
+  namespace: string,
+  podName: string,
+  container: string,
+  command: string[]
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const kc = getKubeConfig();
+  const exec = new k8s.Exec(kc);
+
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+
+    // Use passthrough streams that collect output
+    const stdoutStream = new PassThrough();
+    const stderrStream = new PassThrough();
+
+    stdoutStream.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+
+    stderrStream.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    exec.exec(
+      namespace,
+      podName,
+      container,
+      command,
+      stdoutStream,
+      stderrStream,
+      null,
+      false,
+      (status: k8s.V1Status) => {
+        const exitCode = status.status === 'Success' ? 0 : 1;
+        resolve({ stdout, stderr, exitCode });
+      }
+    ).catch(reject);
+  });
+}
+
+export async function getReadyPod(namespace: string, labelSelector: string): Promise<k8s.V1Pod | null> {
+  const api = getCoreApi();
+  const response = await api.listNamespacedPod(namespace, undefined, undefined, undefined, undefined, labelSelector);
+
+  const readyPod = response.body.items.find((pod) =>
+    pod.status?.conditions?.find((c) => c.type === 'Ready')?.status === 'True'
+  );
+
+  return readyPod || null;
 }
