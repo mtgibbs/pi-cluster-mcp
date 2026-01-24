@@ -24,25 +24,47 @@ spec:
               containerPort: 3000
               protocol: TCP
           env:
+            # Transport config
             - name: MCP_TRANSPORT
               value: "sse"
             - name: MCP_PORT
               value: "3000"
+
+            # MCP API authentication
             - name: MCP_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: mcp-homelab-secrets
                   key: api-key
+
+            # Synology NAS SSH
             - name: NAS_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
                   name: mcp-homelab-secrets
                   key: nas-private-key
+
+            # Jellyfin API
             - name: JELLYFIN_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: mcp-homelab-secrets
                   key: jellyfin-api-key
+
+            # Pi-hole API
+            - name: PIHOLE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-homelab-secrets
+                  key: pihole-api-token
+
+            # Immich API
+            - name: IMMICH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-homelab-secrets
+                  key: immich-api-key
+
           resources:
             requests:
               cpu: 50m
