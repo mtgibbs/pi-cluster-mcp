@@ -45,19 +45,16 @@ async function main(): Promise<void> {
         // New session initialization
         const httpTransport = new StreamableHTTPServerTransport({
           sessionIdGenerator: (): string => randomUUID(),
+          onsessioninitialized: (sid: string): void => {
+            sessions.set(sid, httpTransport);
+            httpTransport.onclose = (): void => {
+              sessions.delete(sid);
+            };
+          },
         });
 
         const server = createServer();
         await server.connect(httpTransport);
-
-        const sid = httpTransport.sessionId;
-        if (sid) {
-          sessions.set(sid, httpTransport);
-          httpTransport.onclose = (): void => {
-            sessions.delete(sid);
-          };
-        }
-
         await httpTransport.handleRequest(req, res, req.body);
       } else if (sessionId) {
         // Session ID provided but not found
