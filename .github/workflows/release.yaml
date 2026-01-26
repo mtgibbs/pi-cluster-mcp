@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g., homelab-mcp-v0.2.0)'
+        required: true
 
 env:
   REGISTRY: ghcr.io
@@ -17,7 +22,24 @@ jobs:
       packages: write
 
     steps:
+      - name: Determine ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "checkout_ref=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+            # Extract version from tag like homelab-mcp-v0.2.0
+            VERSION=$(echo "${{ inputs.tag }}" | sed 's/homelab-mcp-v//')
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          else
+            echo "checkout_ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+            # Extract version from tag like v0.2.0
+            VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.checkout_ref }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -38,8 +60,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.ref.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.ref.outputs.version }}
             type=sha
 
       - name: Build and push
@@ -56,4 +78,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ steps.ref.outputs.version }}
           generate_release_notes: true
