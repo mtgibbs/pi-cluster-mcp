@@ -2,6 +2,7 @@ import type { Tool } from './index.js';
 import { listPods } from '../clients/kubernetes.js';
 import { searchItems, refreshItemMetadata, formatItemName, getJellyfinStats } from '../clients/jellyfin.js';
 import { getImmichStats } from '../clients/immich.js';
+import { getAllowedPaths } from '../clients/synology.js';
 import { k8sError } from '../utils/errors.js';
 import * as k8s from '@kubernetes/client-node';
 
@@ -182,21 +183,19 @@ const fixJellyfinMetadata: Tool = {
 
 const touchNasPath: Tool = {
   name: 'touch_nas_path',
-  description: 'SSH to Synology NAS and touch a path to update timestamps',
+  description: `SSH to Synology NAS and touch a path to update timestamps. Restricted to: ${getAllowedPaths().join(', ')}`,
   inputSchema: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Path on NAS to touch' },
+      path: { type: 'string', description: `Absolute path on NAS (must start with ${getAllowedPaths().join(' or ')})` },
     },
     required: ['path'],
   },
   handler: async (params) => {
     const path = params.path as string;
 
-    // Import dynamically to avoid issues when SSH is not configured
-    const { touchPath } = await import('../clients/synology.js');
-
     try {
+      const { touchPath } = await import('../clients/synology.js');
       await touchPath(path);
       return {
         success: true,

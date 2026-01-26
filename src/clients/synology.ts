@@ -4,6 +4,13 @@ const NAS_HOST = process.env.NAS_HOST || '192.168.1.60';
 const NAS_USER = process.env.NAS_USER || 'mcp';
 const NAS_PRIVATE_KEY = process.env.NAS_PRIVATE_KEY;
 
+// Only these base paths can be accessed via SSH
+const ALLOWED_PATH_PREFIXES = [
+  '/volume1/media',
+  '/volume1/photos',
+  '/volume1/backups',
+];
+
 let sshClient: NodeSSH | null = null;
 
 async function getConnection(): Promise<NodeSSH> {
@@ -25,7 +32,28 @@ async function getConnection(): Promise<NodeSSH> {
   return sshClient;
 }
 
-export async function execCommand(command: string): Promise<{ stdout: string; stderr: string }> {
+function sanitizePath(path: string): string {
+  // Strip shell metacharacters
+  const sanitized = path.replace(/[;&|`$(){}!#]/g, '');
+
+  // Resolve path traversal (reject anything with ..)
+  if (sanitized.includes('..')) {
+    throw new Error('Path traversal not allowed');
+  }
+
+  return sanitized;
+}
+
+function validatePath(path: string): void {
+  const isAllowed = ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (!isAllowed) {
+    throw new Error(
+      `Path not allowed. Must start with: ${ALLOWED_PATH_PREFIXES.join(', ')}`
+    );
+  }
+}
+
+async function execCommand(command: string): Promise<{ stdout: string; stderr: string }> {
   const ssh = await getConnection();
   const result = await ssh.execCommand(command);
   return {
@@ -35,14 +63,27 @@ export async function execCommand(command: string): Promise<{ stdout: string; st
 }
 
 export async function touchPath(path: string): Promise<void> {
-  const safePath = path.replace(/[;&|`$]/g, '');
+  const safePath = sanitizePath(path);
+  validatePath(safePath);
   await execCommand(`touch "${safePath}"`);
 }
 
 export async function checkPath(path: string): Promise<boolean> {
-  const safePath = path.replace(/[;&|`$]/g, '');
+  const safePath = sanitizePath(path);
+  validatePath(safePath);
   const result = await execCommand(`test -e "${safePath}" && echo "exists"`);
   return result.stdout.trim() === 'exists';
+}
+
+export async function listPath(path: string): Promise<string[]> {
+  const safePath = sanitizePath(path);
+  validatePath(safePath);
+  const result = await execCommand(`ls -1 "${safePath}"`);
+  return result.stdout.trim().split('\n').filter((line) => line.length > 0);
+}
+
+export function getAllowedPaths(): string[] {
+  return [...ALLOWED_PATH_PREFIXES];
 }
 
 export function disconnect(): void {
