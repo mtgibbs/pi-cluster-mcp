@@ -4,10 +4,17 @@ const NAS_HOST = process.env.NAS_HOST || '192.168.1.60';
 const NAS_USER = process.env.NAS_USER || 'mcp';
 const NAS_PRIVATE_KEY = process.env.NAS_PRIVATE_KEY;
 
-// Only these base paths can be accessed via SSH
-const ALLOWED_PATH_PREFIXES = [
-  '/volume1/cluster',
-];
+// Configurable via env: comma-separated list of allowed path prefixes
+// Defaults to specific subdirectories, NOT the entire cluster share
+const ALLOWED_PATH_PREFIXES = (process.env.NAS_ALLOWED_PATHS || '')
+  .split(',')
+  .map((p) => p.trim())
+  .filter((p) => p.length > 0);
+
+if (ALLOWED_PATH_PREFIXES.length === 0) {
+  // No paths configured = NAS touch operations disabled
+  console.error('Warning: NAS_ALLOWED_PATHS not set, touch_nas_path will reject all paths');
+}
 
 let sshClient: NodeSSH | null = null;
 
@@ -34,7 +41,7 @@ function sanitizePath(path: string): string {
   // Strip shell metacharacters
   const sanitized = path.replace(/[;&|`$(){}!#]/g, '');
 
-  // Resolve path traversal (reject anything with ..)
+  // Reject path traversal
   if (sanitized.includes('..')) {
     throw new Error('Path traversal not allowed');
   }
@@ -43,10 +50,14 @@ function sanitizePath(path: string): string {
 }
 
 function validatePath(path: string): void {
+  if (ALLOWED_PATH_PREFIXES.length === 0) {
+    throw new Error('NAS_ALLOWED_PATHS not configured, no paths are allowed');
+  }
+
   const isAllowed = ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
   if (!isAllowed) {
     throw new Error(
-      `Path not allowed. Must start with: ${ALLOWED_PATH_PREFIXES.join(', ')}`
+      `Path not allowed. Must start with one of: ${ALLOWED_PATH_PREFIXES.join(', ')}`
     );
   }
 }

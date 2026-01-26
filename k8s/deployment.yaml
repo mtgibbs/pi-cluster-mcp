@@ -37,12 +37,14 @@ spec:
                   name: mcp-homelab-secrets
                   key: api-key
 
-            # Synology NAS SSH
+            # Synology NAS
             - name: NAS_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
                   name: mcp-homelab-secrets
                   key: nas-private-key
+            - name: NAS_ALLOWED_PATHS
+              value: "/volume1/cluster/media,/volume1/cluster/photos,/volume1/cluster/backups"
 
             # Jellyfin API
             - name: JELLYFIN_API_KEY
