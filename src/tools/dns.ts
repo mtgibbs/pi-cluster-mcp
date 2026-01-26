@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod } from '../clients/kubernetes.js';
-import { getFullStats, getMessages } from '../clients/pihole.js';
+import { getFullStats, getMessages, updateGravity } from '../clients/pihole.js';
 import { k8sError, notFoundError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
@@ -156,4 +156,29 @@ const testDnsQuery: Tool = {
   },
 };
 
-export const dnsTools = [getDnsStatus, testDnsQuery];
+const updatePiholeGravity: Tool = {
+  name: 'update_pihole_gravity',
+  description: 'Trigger a Pi-hole gravity update to re-download blocklists and rebuild the database',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: async () => {
+    try {
+      const output = await updateGravity();
+      return {
+        success: true,
+        message: 'Gravity update triggered',
+        output: output.trim(),
+      };
+    } catch (error) {
+      return {
+        error: true,
+        code: 'PIHOLE_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to update gravity',
+      };
+    }
+  },
+};
+
+export const dnsTools = [getDnsStatus, testDnsQuery, updatePiholeGravity];

@@ -91,6 +91,22 @@ export async function getMessages(): Promise<PiholeMessage[]> {
   return response.messages || [];
 }
 
+export async function updateGravity(): Promise<string> {
+  const params = new URLSearchParams();
+  if (PIHOLE_API_TOKEN) {
+    params.set('auth', PIHOLE_API_TOKEN);
+  }
+
+  const url = `${PIHOLE_URL}/admin/api.php?updateGravity&${params.toString()}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Pi-hole API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.text();
+}
+
 export interface PiholeFullStats {
   summary: PiholeStats;
   topQueries: { domain: string; count: number }[];
