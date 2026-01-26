@@ -31,6 +31,41 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that p
 **Container:** Multi-arch Docker image (amd64 + arm64)
 **CI/CD:** GitHub Actions → GHCR
 
+## Claude Desktop Setup
+
+Add the server to your Claude Desktop configuration at **Settings > Developer > Edit Config** (`claude_desktop_config.json`):
+
+### Remote (HTTP — server running in-cluster)
+
+```json
+{
+  "mcpServers": {
+    "homelab": {
+      "url": "https://mcp.lab.mtgibbs.dev/mcp",
+      "headers": {
+        "X-API-Key": "<your-api-key>"
+      }
+    }
+  }
+}
+```
+
+### Local (stdio — running from source)
+
+```json
+{
+  "mcpServers": {
+    "homelab": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "/path/to/pi-cluster-mcp"
+    }
+  }
+}
+```
+
+Requires `npm run build` first and a kubeconfig with access to the cluster.
+
 ## Tools
 
 The server exposes 19 tools across 9 categories. Each tool is defined with a name, description, JSON Schema input, and an async handler function.
