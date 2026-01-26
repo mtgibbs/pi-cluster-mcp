@@ -10,18 +10,18 @@ Build a Model Context Protocol (MCP) server that provides structured tools for P
 │                  Claude Desktop / CLI                        │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              │ SSE (HTTPS) / stdio
+                              │ Streamable HTTP (HTTPS) / stdio
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   mcp-homelab (K3s Pod)                      │
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
 │  │ MCP Server  │  │ K8s Client   │  │ SSH Client (NAS)  │  │
-│  │ (stdio/SSE) │  │ (in-cluster) │  │ (node-ssh)        │  │
+│  │(stdio/HTTP) │  │ (in-cluster) │  │ (node-ssh)        │  │
 │  └─────────────┘  └──────────────┘  └───────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
          ▼                    ▼                    ▼
-   Ingress (SSE)       K8s API Server        Synology NAS
+   Ingress (HTTP)      K8s API Server        Synology NAS
    mcp.lab.mtgibbs.dev (ServiceAccount)      (SSH @ 192.168.1.60)
 ```
 
@@ -155,7 +155,7 @@ Only these deployments can be restarted via `restart_deployment`:
 |------|-------|---------|
 | `synology-mcp-ssh` | `private-key` | SSH key for NAS operations |
 | `jellyfin-api-key` | `api-key` | Jellyfin API for metadata refresh |
-| `mcp-homelab-api-key` | `api-key` | SSE endpoint authentication |
+| `mcp-homelab-api-key` | `api-key` | HTTP endpoint authentication |
 
 ## Development
 
@@ -238,7 +238,7 @@ export const myNewTool: Tool = {
 - Check RBAC: `kubectl auth can-i list pods --as=system:serviceaccount:mcp-homelab:mcp-homelab`
 - Check secrets synced: `kubectl get externalsecrets -n mcp-homelab`
 
-### SSE connection fails
+### HTTP connection fails
 - Verify Tailscale connected
 - Check API key in request header
 - Check ingress: `kubectl describe ingress mcp-homelab -n mcp-homelab`

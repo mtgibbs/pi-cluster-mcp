@@ -9,18 +9,18 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that p
 │                  Claude Desktop / CLI                         │
 └──────────────────────────────────────────────────────────────┘
                               │
-                              │ SSE (HTTPS) / stdio
+                              │ Streamable HTTP (HTTPS) / stdio
                               ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                   mcp-homelab (K3s Pod)                       │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
 │  │ MCP Server  │  │ K8s Client   │  │ SSH Client (NAS)   │  │
-│  │ (stdio/SSE) │  │ (in-cluster) │  │ (node-ssh)         │  │
+│  │(stdio/HTTP) │  │ (in-cluster) │  │ (node-ssh)         │  │
 │  └─────────────┘  └──────────────┘  └────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
          │                    │                    │
          ▼                    ▼                    ▼
-   Ingress (SSE)       K8s API Server        Synology NAS
+   Ingress (HTTP)      K8s API Server        Synology NAS
                        (ServiceAccount)      (SSH)
 ```
 
@@ -269,9 +269,9 @@ export const tools: Tool[] = [
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `MCP_TRANSPORT` | no | `stdio` | Transport mode: `stdio` or `sse` |
-| `MCP_PORT` | no | `3000` | Port for SSE transport |
-| `MCP_API_KEY` | for SSE | — | API key for SSE endpoint authentication (`X-API-Key` header) |
+| `MCP_TRANSPORT` | no | `stdio` | Transport mode: `stdio` or `http` |
+| `MCP_PORT` | no | `3000` | Port for HTTP transport |
+| `MCP_API_KEY` | for HTTP | — | API key for HTTP endpoint authentication (`X-API-Key` header) |
 | `NAS_HOST` | for NAS tools | — | Synology NAS IP/hostname |
 | `NAS_USER` | for NAS tools | — | SSH username for NAS |
 | `NAS_PRIVATE_KEY` | for NAS tools | — | SSH private key for NAS access |
@@ -289,7 +289,7 @@ All secrets are stored in a single 1Password item named `mcp-homelab`. Create th
 
 | Field | Description |
 |-------|-------------|
-| `api-key` | API key for authenticating SSE connections |
+| `api-key` | API key for authenticating HTTP connections |
 | `nas-private-key` | Ed25519 SSH private key for Synology NAS access |
 | `jellyfin-api-key` | Jellyfin API key (generate in Jellyfin Dashboard > API Keys) |
 | `pihole-api-token` | Pi-hole API token (found in Pi-hole Admin > Settings > API) |
@@ -330,7 +330,7 @@ The `k8s/externalsecret.yaml` manifest syncs these fields into a Kubernetes secr
 ### Defense in Depth
 
 1. **Network** — Ingress only accessible via Tailscale
-2. **Authentication** — API key required in `X-API-Key` header for SSE transport
+2. **Authentication** — API key required in `X-API-Key` header for HTTP transport
 3. **Kubernetes RBAC** — ServiceAccount with minimal permissions (read-only for most resources, limited write for specific operations)
 4. **Application Layer** — Deployment restart whitelist enforced in code, NAS path allowlist enforced in code
 5. **NAS Access** — Path sanitization (shell metacharacter stripping, traversal rejection), configurable path prefix allowlist, dedicated low-privilege SSH user

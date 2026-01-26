@@ -19,9 +19,11 @@
   "dependencies": {
     "@kubernetes/client-node": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^5.2.1",
     "node-ssh": "^13.2.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
