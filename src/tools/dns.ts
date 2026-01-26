@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod } from '../clients/kubernetes.js';
-import { getFullStats, getMessages, updateGravity } from '../clients/pihole.js';
+import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
 import { k8sError, notFoundError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
@@ -181,4 +181,68 @@ const updatePiholeGravity: Tool = {
   },
 };
 
-export const dnsTools = [getDnsStatus, testDnsQuery, updatePiholeGravity];
+const getPiholeWhitelist: Tool = {
+  name: 'get_pihole_whitelist',
+  description: 'List all whitelisted domains in Pi-hole',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  handler: async () => {
+    try {
+      const entries = await getWhitelist();
+      return {
+        total: entries.length,
+        domains: entries.map((e) => ({
+          domain: e.domain,
+          enabled: e.enabled === 1,
+          comment: e.comment || undefined,
+          type: e.type === 0 ? 'exact' : 'regex',
+          addedAt: new Date(e.date_added * 1000).toISOString(),
+        })),
+      };
+    } catch (error) {
+      return {
+        error: true,
+        code: 'PIHOLE_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to fetch whitelist',
+      };
+    }
+  },
+};
+
+const getPiholeQueries: Tool = {
+  name: 'get_pihole_queries',
+  description: 'Get recent DNS queries from Pi-hole query log',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      count: { type: 'number', description: 'Number of recent queries to return (default: 50, max: 500)' },
+    },
+  },
+  handler: async (params) => {
+    const count = Math.min(Math.max((params.count as number) || 50, 1), 500);
+
+    try {
+      const queries = await getRecentQueries(count);
+      return {
+        total: queries.length,
+        queries: queries.map((q) => ({
+          timestamp: q[0] ? new Date(parseInt(q[0]) * 1000).toISOString() : undefined,
+          type: q[1],
+          domain: q[2],
+          client: q[3],
+          status: q[4],
+        })),
+      };
+    } catch (error) {
+      return {
+        error: true,
+        code: 'PIHOLE_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to fetch queries',
+      };
+    }
+  },
+};
+
+export const dnsTools = [getDnsStatus, testDnsQuery, updatePiholeGravity, getPiholeWhitelist, getPiholeQueries];

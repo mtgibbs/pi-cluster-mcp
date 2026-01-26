@@ -22,6 +22,8 @@ describe('tool registry', () => {
     expect(toolNames).toContain('fix_jellyfin_metadata');
     expect(toolNames).toContain('touch_nas_path');
     expect(toolNames).toContain('update_pihole_gravity');
+    expect(toolNames).toContain('get_pihole_whitelist');
+    expect(toolNames).toContain('get_pihole_queries');
   });
 
   it('has no duplicate tool names', () => {

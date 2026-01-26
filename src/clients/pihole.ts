@@ -91,6 +91,31 @@ export async function getMessages(): Promise<PiholeMessage[]> {
   return response.messages || [];
 }
 
+export interface PiholeDomainEntry {
+  id: number;
+  type: number;
+  domain: string;
+  enabled: number;
+  date_added: number;
+  date_modified: number;
+  comment: string;
+  groups: number[];
+}
+
+interface PiholeListResponse {
+  data: PiholeDomainEntry[];
+}
+
+export async function getWhitelist(): Promise<PiholeDomainEntry[]> {
+  const response = await piholeFetch<PiholeListResponse>('list=white');
+  return response.data || [];
+}
+
+export async function getRecentQueries(count = 100): Promise<string[][]> {
+  const response = await piholeFetch<{ data: string[][] }>(`getAllQueries=${count}`);
+  return response.data || [];
+}
+
 export async function updateGravity(): Promise<string> {
   const params = new URLSearchParams();
   if (PIHOLE_API_TOKEN) {
