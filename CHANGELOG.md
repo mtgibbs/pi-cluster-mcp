@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.1...homelab-mcp-v0.1.2) (2026-01-26)
+
+
+### Bug Fixes
+
+* use onsessioninitialized callback for session registration ([39248fe](https://github.com/mtgibbs/pi-cluster-mcp/commit/39248fe59f57438675eaa5968dab6885cc641c31))
+
 ## [0.1.1](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.0...homelab-mcp-v0.1.1) (2026-01-26)
 
 
