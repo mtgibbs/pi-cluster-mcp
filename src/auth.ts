@@ -2,8 +2,8 @@ const API_KEY = process.env.MCP_API_KEY;
 
 export function validateApiKey(providedKey: string | undefined): boolean {
   if (!API_KEY) {
-    console.error('Warning: MCP_API_KEY not set, authentication disabled');
-    return true;
+    console.error('Error: MCP_API_KEY not set. Authentication failing securely.');
+    return false;
   }
 
   return providedKey === API_KEY;

@@ -1,7 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 
-const NAS_HOST = process.env.NAS_HOST || '192.168.1.60';
-const NAS_USER = process.env.NAS_USER || 'cluster-mcp';
+const NAS_HOST = process.env.NAS_HOST;
+const NAS_USER = process.env.NAS_USER;
 const NAS_PRIVATE_KEY = process.env.NAS_PRIVATE_KEY;
 
 // Configurable via env: comma-separated list of allowed path prefixes
@@ -21,6 +21,14 @@ let sshClient: NodeSSH | null = null;
 async function getConnection(): Promise<NodeSSH> {
   if (sshClient && sshClient.isConnected()) {
     return sshClient;
+  }
+
+  if (!NAS_HOST) {
+    throw new Error('NAS_HOST environment variable not set');
+  }
+
+  if (!NAS_USER) {
+    throw new Error('NAS_USER environment variable not set');
   }
 
   if (!NAS_PRIVATE_KEY) {
