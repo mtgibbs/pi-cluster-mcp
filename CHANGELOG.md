@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.3...homelab-mcp-v0.1.4) (2026-01-26)
+
+
+### Bug Fixes
+
+* scope pods/exec RBAC to pihole and jellyfin namespaces, validate flux resource input ([5c5a0d4](https://github.com/mtgibbs/pi-cluster-mcp/commit/5c5a0d4034b4173fbf8cca9cb29a39f5782b43e0))
+
+
+### Documentation
+
+* add Claude Desktop setup section to README ([6232afe](https://github.com/mtgibbs/pi-cluster-mcp/commit/6232afe2a615e568767ac047184cb4f25d57530d))
+* add Pi-hole whitelist, query log, and gravity tools to README and CLAUDE.md ([c0c36cd](https://github.com/mtgibbs/pi-cluster-mcp/commit/c0c36cde94780a89da0ccfb06cc4fbd2d7ea89ce))
+
 ## [0.1.3](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.2...homelab-mcp-v0.1.3) (2026-01-26)
 
 
