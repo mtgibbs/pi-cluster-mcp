@@ -42,3 +42,33 @@ subjects:
   - kind: ServiceAccount
     name: mcp-homelab
     namespace: mcp-homelab
+---
+# Restrict pod/exec to pihole namespace only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mcp-homelab-pihole-exec
+  namespace: pihole
+  labels:
+    app.kubernetes.io/name: mcp-homelab
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods/exec
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mcp-homelab-pihole-exec
+  namespace: pihole
+  labels:
+    app.kubernetes.io/name: mcp-homelab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcp-homelab-pihole-exec
+subjects:
+  - kind: ServiceAccount
+    name: mcp-homelab
+    namespace: mcp-homelab

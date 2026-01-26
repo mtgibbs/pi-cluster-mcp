@@ -91,9 +91,3 @@ rules:
       - nodes
       - pods
     verbs: ["get", "list"]
-
-  # Pod exec for Jellyfin namespace only (enforced by RoleBinding)
-  - apiGroups: [""]
-    resources:
-      - pods/exec
-    verbs: ["create"]

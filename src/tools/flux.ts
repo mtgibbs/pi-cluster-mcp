@@ -81,7 +81,24 @@ const reconcileFlux: Tool = {
       const now = new Date().toISOString();
 
       if (resource) {
-        const [type, namespace, name] = resource.split('/');
+        // Validate resource format: type/namespace/name
+        // type must be 'kustomization' or 'helmrelease'
+        // namespace and name must be valid DNS-1123 subdomains (lowercase alphanumeric, '-', no dots)
+        const parts = resource.split('/');
+        if (parts.length !== 3) {
+           return { error: true, code: 'INVALID_FORMAT', message: 'Resource must be in format "type/namespace/name"' };
+        }
+
+        const [type, namespace, name] = parts;
+        if (type !== 'kustomization' && type !== 'helmrelease') {
+          return { error: true, code: 'INVALID_TYPE', message: 'Type must be "kustomization" or "helmrelease"' };
+        }
+
+        const dns1123Regex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+        if (!dns1123Regex.test(namespace) || !dns1123Regex.test(name)) {
+          return { error: true, code: 'INVALID_NAME', message: 'Namespace and name must be valid DNS-1123 identifiers' };
+        }
+
         const plural = type === 'kustomization' ? 'kustomizations' : 'helmreleases';
         const group = type === 'kustomization'
           ? 'kustomize.toolkit.fluxcd.io'
