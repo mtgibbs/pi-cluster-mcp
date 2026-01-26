@@ -1,7 +1,7 @@
 import { NodeSSH } from 'node-ssh';
 
 const NAS_HOST = process.env.NAS_HOST || '192.168.1.60';
-const NAS_USER = process.env.NAS_USER || 'mcp';
+const NAS_USER = process.env.NAS_USER || 'cluster-mcp';
 const NAS_PRIVATE_KEY = process.env.NAS_PRIVATE_KEY;
 
 // Configurable via env: comma-separated list of allowed path prefixes
