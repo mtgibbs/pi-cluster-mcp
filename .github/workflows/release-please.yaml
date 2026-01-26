@@ -24,6 +24,22 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Trigger CI on release PR branch
+        if: steps.release.outputs.pr
+        uses: actions/github-script@v7
+        env:
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        with:
+          script: |
+            const prData = JSON.parse(process.env.PR_JSON);
+            console.log(`Triggering CI on branch: ${prData.headBranchName}`);
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yaml',
+              ref: prData.headBranchName,
+            });
+
       - name: Check if release commit
         id: check-release
         run: |
