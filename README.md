@@ -33,7 +33,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that p
 
 ## Tools
 
-The server exposes 16 tools across 9 categories. Each tool is defined with a name, description, JSON Schema input, and an async handler function.
+The server exposes 19 tools across 9 categories. Each tool is defined with a name, description, JSON Schema input, and an async handler function.
 
 ### Diagnostic Tools (Read-Only)
 
@@ -55,7 +55,29 @@ Pi-hole and Unbound DNS service health including query statistics.
 |-----------|------|----------|---------|-------------|
 | `includeStats` | boolean | no | `true` | Include Pi-hole query statistics (queries today, blocked count, top queries, top blocked) |
 
-**Returns:** Pi-hole and Unbound pod status, overall health boolean. When stats enabled: queries today, blocked today, blocked percentage, domains on blocklist, top queries, top blocked domains.
+**Returns:** Pi-hole and Unbound pod status, overall health boolean. When stats enabled: queries today, blocked today, blocked percentage, domains on blocklist, top queries, top blocked domains. Also includes Pi-hole diagnostics (FTL warnings, rate-limited clients) when available.
+
+---
+
+#### `get_pihole_whitelist`
+
+List all whitelisted domains in Pi-hole.
+
+**Parameters:** None
+
+**Returns:** Total count and list of whitelisted domains with enabled state, type (exact or regex), comment, and date added.
+
+---
+
+#### `get_pihole_queries`
+
+Get recent DNS queries from Pi-hole query log.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `count` | number | no | `50` | Number of recent queries to return (max: 500) |
+
+**Returns:** List of recent queries with timestamp, query type, domain, client, and status.
 
 ---
 
@@ -164,6 +186,16 @@ Run a DNS lookup against Pi-hole by executing `dig` in a Pi-hole pod.
 | `type` | string | no | `A` | DNS record type: A, AAAA, MX, TXT, CNAME, NS, SOA, PTR |
 
 **Returns:** Query answers, resolved boolean, which pod executed the query, exit code.
+
+---
+
+#### `update_pihole_gravity`
+
+Trigger a Pi-hole gravity update to re-download blocklists and rebuild the database.
+
+**Parameters:** None
+
+**Returns:** Success status and gravity update output.
 
 ---
 

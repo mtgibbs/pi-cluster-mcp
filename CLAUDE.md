@@ -128,7 +128,9 @@ Only these deployments can be restarted via `restart_deployment`:
 | Tool | Description | Returns |
 |------|-------------|---------|
 | `get_cluster_health` | Overall cluster status | Nodes, resource usage, problem pods, warning events |
-| `get_dns_status` | Pi-hole + Unbound health | Pod status, blocked queries, upstream health |
+| `get_dns_status` | Pi-hole + Unbound health | Pod status, blocked queries, upstream health, diagnostics |
+| `get_pihole_whitelist` | Pi-hole whitelist | All whitelisted domains with type and status |
+| `get_pihole_queries` | Pi-hole query log | Recent DNS queries with type, domain, client, status |
 | `get_flux_status` | GitOps sync state | Kustomizations, HelmReleases with ready state |
 | `get_certificate_status` | TLS cert health | Certs with ready state, expiry, pending challenges |
 | `get_secrets_status` | External Secrets sync | Sync status, last refresh, errors |
@@ -146,6 +148,7 @@ Only these deployments can be restarted via `restart_deployment`:
 | `fix_jellyfin_metadata` | `name` | Find item in DB, trigger API refresh |
 | `trigger_backup` | `job_name` | Create Job from CronJob |
 | `test_dns_query` | `domain`, `type?` | Run dig against Pi-hole |
+| `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |
 | `touch_nas_path` | `path` | SSH to Synology, touch path |
 
