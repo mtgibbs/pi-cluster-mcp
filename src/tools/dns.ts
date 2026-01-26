@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod } from '../clients/kubernetes.js';
-import { getFullStats } from '../clients/pihole.js';
+import { getFullStats, getMessages } from '../clients/pihole.js';
 import { k8sError, notFoundError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
@@ -46,10 +46,13 @@ const getDnsStatus: Tool = {
         healthy: piholePods.every((p) => p.ready) && unboundPods.every((p) => p.ready),
       };
 
-      // Fetch Pi-hole stats if requested and Pi-hole is healthy
+      // Fetch Pi-hole stats and diagnostics if requested and Pi-hole is healthy
       if (includeStats && piholePods.some((p) => p.ready)) {
         try {
-          const stats = await getFullStats(5);
+          const [stats, messages] = await Promise.all([
+            getFullStats(5),
+            getMessages(),
+          ]);
           result.stats = {
             status: stats.summary.status,
             queriesToday: stats.summary.dns_queries_today,
@@ -66,6 +69,14 @@ const getDnsStatus: Tool = {
             topQueries: stats.topQueries,
             topBlocked: stats.topBlocked,
           };
+          if (messages.length > 0) {
+            result.diagnostics = messages.map((msg) => ({
+              type: msg.type,
+              message: msg.message,
+              details: [msg.blob1, msg.blob2, msg.blob3, msg.blob4, msg.blob5].filter((b) => b),
+              timestamp: new Date(msg.timestamp * 1000).toISOString(),
+            }));
+          }
         } catch (statsError) {
           result.statsError = statsError instanceof Error ? statsError.message : 'Failed to fetch Pi-hole stats';
         }

@@ -38,6 +38,22 @@ interface QueryTypes {
   querytypes: Record<string, number>;
 }
 
+interface PiholeMessage {
+  id: number;
+  type: string;
+  message: string;
+  blob1: string;
+  blob2: string;
+  blob3: string;
+  blob4: string;
+  blob5: string;
+  timestamp: number;
+}
+
+interface PiholeMessagesResponse {
+  messages: PiholeMessage[];
+}
+
 async function piholeFetch<T>(endpoint: string): Promise<T> {
   const params = new URLSearchParams();
   if (PIHOLE_API_TOKEN) {
@@ -68,6 +84,11 @@ export async function getQueryTypes(): Promise<QueryTypes> {
 
 export async function getStatus(): Promise<{ status: string }> {
   return piholeFetch<{ status: string }>('status');
+}
+
+export async function getMessages(): Promise<PiholeMessage[]> {
+  const response = await piholeFetch<PiholeMessagesResponse>('messages');
+  return response.messages || [];
 }
 
 export interface PiholeFullStats {
