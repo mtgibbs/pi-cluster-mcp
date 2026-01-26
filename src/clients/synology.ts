@@ -6,9 +6,7 @@ const NAS_PRIVATE_KEY = process.env.NAS_PRIVATE_KEY;
 
 // Only these base paths can be accessed via SSH
 const ALLOWED_PATH_PREFIXES = [
-  '/volume1/media',
-  '/volume1/photos',
-  '/volume1/backups',
+  '/volume1/cluster',
 ];
 
 let sshClient: NodeSSH | null = null;
