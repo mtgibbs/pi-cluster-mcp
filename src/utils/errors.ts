@@ -42,8 +42,9 @@ export function k8sError(error: unknown): ToolError {
 
     // Check for statusCode (common in K8s errors)
     if (err.statusCode && err.body) {
+      const statusCode = String(err.statusCode);
       const body = typeof err.body === 'string' ? err.body : JSON.stringify(err.body);
-      return createError('K8S_ERROR', `HTTP ${err.statusCode}: ${body}`);
+      return createError('K8S_ERROR', `HTTP ${statusCode}: ${body}`);
     }
   }
 
