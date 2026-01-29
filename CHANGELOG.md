@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.5](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.4...homelab-mcp-v0.1.5) (2026-01-29)
+
+
+### Features
+
+* add 6 diagnostic tools for network debugging and pod logs ([3415b79](https://github.com/mtgibbs/pi-cluster-mcp/commit/3415b79286b9b82a1c343e7c265963f4e2f9b6ba))
+* add 6 diagnostic tools for network debugging and pod logs ([54118d1](https://github.com/mtgibbs/pi-cluster-mcp/commit/54118d1886e9741657ecb7c87134ab58f1d81a34))
+
+
+### Documentation
+
+* rewrite README with comprehensive features and security details ([027e1ad](https://github.com/mtgibbs/pi-cluster-mcp/commit/027e1add8b9830e152d7cc09db748ddaca2cdae6))
+
 ## [0.1.4](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.3...homelab-mcp-v0.1.4) (2026-01-26)
 
 
