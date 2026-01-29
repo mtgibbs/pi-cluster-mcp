@@ -12,6 +12,8 @@ resources:
   - service.yaml
   - ingress.yaml
   - externalsecret.yaml
+  - debug-agent-daemonset.yaml
+  - debug-agent-role.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: homelab

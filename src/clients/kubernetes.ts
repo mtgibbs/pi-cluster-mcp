@@ -155,3 +155,48 @@ export async function getReadyPod(namespace: string, labelSelector: string): Pro
 
   return readyPod || null;
 }
+
+export async function getReadyPodOnNode(
+  namespace: string,
+  labelSelector: string,
+  nodeName: string
+): Promise<k8s.V1Pod | null> {
+  const api = getCoreApi();
+  const response = await api.listNamespacedPod(namespace, undefined, undefined, undefined, undefined, labelSelector);
+
+  const pod = response.body.items.find(
+    (p) =>
+      p.spec?.nodeName === nodeName &&
+      p.status?.conditions?.find((c) => c.type === 'Ready')?.status === 'True'
+  );
+
+  return pod || null;
+}
+
+export interface PodLogOptions {
+  container?: string;
+  tailLines?: number;
+  sinceSeconds?: number;
+  previous?: boolean;
+}
+
+export async function readPodLog(
+  namespace: string,
+  podName: string,
+  options: PodLogOptions = {}
+): Promise<string> {
+  const api = getCoreApi();
+  const response = await api.readNamespacedPodLog(
+    podName,
+    namespace,
+    options.container,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    options.previous,
+    options.sinceSeconds,
+    options.tailLines
+  );
+  return response.body;
+}

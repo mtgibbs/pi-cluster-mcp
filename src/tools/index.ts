@@ -7,6 +7,8 @@ import { backupTools } from './backups.js';
 import { ingressTools } from './ingress.js';
 import { tailscaleTools } from './tailscale.js';
 import { mediaTools } from './media.js';
+import { networkingTools } from './networking.js';
+import { logsTools } from './logs.js';
 
 export interface Tool {
   name: string;
@@ -29,6 +31,8 @@ export const tools: Tool[] = [
   ...ingressTools,
   ...tailscaleTools,
   ...mediaTools,
+  ...networkingTools,
+  ...logsTools,
 ];
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));

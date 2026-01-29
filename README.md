@@ -24,6 +24,14 @@ This server provides a safe, structured interface for LLMs (like Claude) to inte
 - **Stats:** detailed library statistics and active session monitoring.
 - **Management:** Search media libraries and trigger metadata refreshes for specific items.
 
+### Network Diagnostics
+- **Node Networking:** Inspect interfaces, addresses, routes, and routing rules on any cluster node.
+- **Firewall Rules:** Dump iptables/ip6tables rules by table and chain.
+- **Connection Tracking:** View conntrack entries with source/destination filtering.
+- **Ingress Testing:** Curl ingress URLs from within the cluster with detailed timing.
+- **Connectivity Testing:** Ping and TCP port checks between nodes and targets.
+- **Pod Logs:** Retrieve pod logs with container, time range, and line count filtering.
+
 ### Infrastructure
 - **Certificates:** Monitor cert-manager certificate expiry and readiness.
 - **NAS Integration:** Securely touch specific paths on a Synology NAS (via SSH) to trigger file system events.
@@ -36,7 +44,7 @@ This project is built with a "defense in depth" approach:
 1.  **Least Privilege:** Runs with a dedicated ServiceAccount.
     -   **Read-Only:** Most resources (Pods, Events, Flux, Certs).
     -   **Scoped Action:** `patch` is strictly limited to whitelisted deployments and Flux resources.
-    -   **Scoped Exec:** `pod/exec` is strictly limited to `jellyfin` and `pihole` namespaces via specific Roles.
+    -   **Scoped Exec:** `pod/exec` is strictly limited to `jellyfin`, `pihole`, and `mcp-homelab` (debug-agent) namespaces via specific Roles.
 2.  **Input Validation:** Strict validation on all tool inputs (especially for file paths and resource names).
 3.  **Authentication:** Requires `X-API-Key` header for all requests.
 4.  **Network:** Designed to run behind an Ingress accessible only via Tailscale.
@@ -99,3 +107,5 @@ The server is designed to be deployed as a Pod in your cluster.
 | **Backups** | `get_backup_status`, `trigger_backup` |
 | **Secrets** | `get_secrets_status`, `refresh_secret` |
 | **System** | `get_certificate_status`, `get_ingress_status`, `touch_nas_path` |
+| **Networking** | `get_node_networking`, `get_iptables_rules`, `get_conntrack_entries`, `curl_ingress`, `test_pod_connectivity` |
+| **Logs** | `get_pod_logs` |
