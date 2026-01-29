@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.7...homelab-mcp-v0.1.8) (2026-01-29)
+
+
+### Bug Fixes
+
+* improve error handling and add missing RBAC for exec ([86dfd01](https://github.com/mtgibbs/pi-cluster-mcp/commit/86dfd01aa48654f7260d06a212eb9226b20921d8))
+
 ## [0.1.7](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.6...homelab-mcp-v0.1.7) (2026-01-29)
 
 
