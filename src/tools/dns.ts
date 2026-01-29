@@ -4,7 +4,7 @@ import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQuerie
 import { k8sError, notFoundError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
-const PIHOLE_LABEL = 'app.kubernetes.io/name=pihole';
+const PIHOLE_LABEL = 'app=pihole';
 const PIHOLE_CONTAINER = 'pihole';
 
 const getDnsStatus: Tool = {
