@@ -141,12 +141,7 @@ export async function execInPod(
         const exitCode = status.status === 'Success' ? 0 : 1;
         resolve({ stdout, stderr, exitCode });
       }
-    ).catch((err) => {
-      // Enhance error message with context
-      const errMsg = err instanceof Error ? err.message : String(err);
-      const enhancedErr = new Error(`exec failed for ${namespace}/${podName}/${container}: ${errMsg}`);
-      reject(enhancedErr);
-    });
+    ).catch(reject);
   });
 }
 
@@ -203,6 +198,5 @@ export async function readPodLog(
     options.sinceSeconds,
     options.tailLines
   );
-  // response.body can be undefined/null for empty logs
-  return response.body ?? '';
+  return response.body;
 }

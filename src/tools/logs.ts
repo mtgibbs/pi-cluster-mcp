@@ -93,7 +93,7 @@ const getPodLogs: Tool = {
       });
 
       // Truncate to prevent response bloat
-      let output = logText || '';
+      let output = logText;
       let truncated = false;
       if (output.length > MAX_LOG_BYTES) {
         output = output.substring(output.length - MAX_LOG_BYTES);
