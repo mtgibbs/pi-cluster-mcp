@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.6...homelab-mcp-v0.1.7) (2026-01-29)
+
+
+### Bug Fixes
+
+* auto-create new session when stale session ID is provided ([2f41312](https://github.com/mtgibbs/pi-cluster-mcp/commit/2f41312ce4e050de40c310adc8041a97c2672546))
+
 ## [0.1.6](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.5...homelab-mcp-v0.1.6) (2026-01-29)
 
 
