@@ -58,10 +58,15 @@ homelab-mcp/
 │   │   ├── backups.ts           # get_backup_status, trigger_backup
 │   │   ├── ingress.ts           # get_ingress_status
 │   │   ├── tailscale.ts         # get_tailscale_status
-│   │   └── media.ts             # get_media_status, fix_jellyfin_metadata
+│   │   ├── media.ts             # get_media_status, fix_jellyfin_metadata
+│   │   ├── networking.ts        # get_node_networking, get_iptables_rules, etc.
+│   │   └── logs.ts              # get_pod_logs
 │   └── utils/
 │       ├── errors.ts            # Structured error responses
-│       └── whitelist.ts         # Allowed deployments for restart
+│       ├── whitelist.ts         # Allowed deployments for restart
+│       ├── node-validation.ts   # Node name validation (cached)
+│       ├── debug-agent.ts       # execOnNode() via DaemonSet
+│       └── parsers.ts           # iptables, conntrack, ping parsers
 ├── k8s/
 │   ├── namespace.yaml
 │   ├── serviceaccount.yaml
@@ -71,6 +76,8 @@ homelab-mcp/
 │   ├── service.yaml
 │   ├── ingress.yaml
 │   ├── externalsecret.yaml
+│   ├── debug-agent-daemonset.yaml  # Netshoot DaemonSet for node diagnostics
+│   ├── debug-agent-role.yaml       # RBAC for exec into debug-agent pods
 │   └── kustomization.yaml
 ├── Dockerfile
 ├── package.json
@@ -90,7 +97,7 @@ homelab-mcp/
 ### RBAC Permissions
 
 **Read-Only Access:**
-- Pods, Services, Nodes, Events, ConfigMaps, PVCs, Namespaces
+- Pods, Pods/Log, Services, Nodes, Events, ConfigMaps, PVCs, Namespaces
 - Deployments, StatefulSets, DaemonSets
 - Flux resources (Kustomizations, HelmReleases, Sources)
 - Cert-manager resources (Certificates, Challenges)
@@ -103,7 +110,7 @@ homelab-mcp/
 - `patch` Flux resources (for reconcile trigger)
 - `patch` ExternalSecrets (for force refresh)
 - `create` Jobs (for manual backup trigger)
-- `create` pods/exec (Jellyfin namespace only, for metadata fix)
+- `create` pods/exec (Jellyfin, Pi-hole, and mcp-homelab namespaces)
 
 **Explicitly NOT Allowed:**
 - `delete` on any resource
@@ -138,6 +145,10 @@ Only these deployments can be restarted via `restart_deployment`:
 | `get_ingress_status` | Ingress health | Hosts, TLS status, backend health |
 | `get_tailscale_status` | VPN connector status | Exit node, routes, connectivity |
 | `get_media_status` | Media services health | Jellyfin/Immich pod status, NFS mounts |
+| `get_node_networking` | Node network config | Interfaces, addresses, routes, routing rules (via ip -j) |
+| `get_iptables_rules` | Firewall rules | iptables/ip6tables rules per table/chain on a node |
+| `get_conntrack_entries` | Connection tracking | Active connections with NAT, states, marks |
+| `get_pod_logs` | Pod log retrieval | Tail logs with container, time, and line filtering |
 
 ### Action Tools
 
@@ -151,6 +162,8 @@ Only these deployments can be restarted via `restart_deployment`:
 | `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |
 | `touch_nas_path` | `path` | SSH to Synology, touch path |
+| `curl_ingress` | `url`, `timeout?`, `fromNode?` | Test HTTP(S) from within cluster |
+| `test_pod_connectivity` | `sourceNode`, `target`, `port?` | Ping + TCP port check from a node |
 
 ## Secrets Required (1Password)
 
