@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.8...homelab-mcp-v0.1.9) (2026-01-29)
+
+
+### Bug Fixes
+
+* properly stringify statusCode in error message ([4b28aae](https://github.com/mtgibbs/pi-cluster-mcp/commit/4b28aae5a746e021fac336e5a30e2814de4a9d5b))
+
 ## [0.1.8](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.7...homelab-mcp-v0.1.8) (2026-01-29)
 
 
