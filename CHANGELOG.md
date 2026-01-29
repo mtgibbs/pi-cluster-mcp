@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.5...homelab-mcp-v0.1.6) (2026-01-29)
+
+
+### Bug Fixes
+
+* use correct label selector for Pi-hole pod lookup ([450b966](https://github.com/mtgibbs/pi-cluster-mcp/commit/450b966b6d9d67dcc33d72ba52f5309f7777b5d8))
+
 ## [0.1.5](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.4...homelab-mcp-v0.1.5) (2026-01-29)
 
 
