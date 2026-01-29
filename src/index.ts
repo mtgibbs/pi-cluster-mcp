@@ -56,8 +56,24 @@ async function main(): Promise<void> {
         const server = createServer();
         await server.connect(httpTransport);
         await httpTransport.handleRequest(req, res, req.body);
+      } else if (sessionId && req.method === 'POST') {
+        // Stale session ID - create a new session instead of failing
+        // This handles pod restarts gracefully
+        const httpTransport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: (): string => randomUUID(),
+          onsessioninitialized: (sid: string): void => {
+            sessions.set(sid, httpTransport);
+            httpTransport.onclose = (): void => {
+              sessions.delete(sid);
+            };
+          },
+        });
+
+        const server = createServer();
+        await server.connect(httpTransport);
+        await httpTransport.handleRequest(req, res, req.body);
       } else if (sessionId) {
-        // Session ID provided but not found
+        // Non-POST with stale session
         res.status(404).json({ error: 'Session not found' });
       } else {
         res.status(400).json({ error: 'Bad request' });
