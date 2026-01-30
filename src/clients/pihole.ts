@@ -2,7 +2,7 @@
 // Docs: http://pi.hole/api/docs (self-hosted on each Pi-hole instance)
 
 const PIHOLE_URL = process.env.PIHOLE_URL || 'http://pihole-web.pihole.svc.cluster.local';
-const PIHOLE_PASSWORD = process.env.PIHOLE_PASSWORD;
+const PIHOLE_PASSWORD = process.env.PIHOLE_API_TOKEN || process.env.PIHOLE_PASSWORD;
 
 // Session management
 let sessionId: string | null = null;
