@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.13...homelab-mcp-v0.1.14) (2026-01-30)
+
+
+### Bug Fixes
+
+* improve exec error handling with timeout and WebSocket events ([dee1d1b](https://github.com/mtgibbs/pi-cluster-mcp/commit/dee1d1bac93c010f04ac4b42b082188d766e857e))
+
 ## [0.1.13](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.12...homelab-mcp-v0.1.13) (2026-01-30)
 
 
