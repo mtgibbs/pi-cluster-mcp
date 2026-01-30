@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.15...homelab-mcp-v0.1.16) (2026-01-30)
+
+
+### Bug Fixes
+
+* read PIHOLE_API_TOKEN env var for authentication ([e6ca4b6](https://github.com/mtgibbs/pi-cluster-mcp/commit/e6ca4b6b2c556469935e2c17a7cee3f5d33c2827)), closes [#23](https://github.com/mtgibbs/pi-cluster-mcp/issues/23)
+
 ## [0.1.15](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.14...homelab-mcp-v0.1.15) (2026-01-30)
 
 
