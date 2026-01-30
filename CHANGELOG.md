@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.11...homelab-mcp-v0.1.12) (2026-01-30)
+
+
+### Bug Fixes
+
+* update External Secrets API from v1beta1 to v1 ([8087f74](https://github.com/mtgibbs/pi-cluster-mcp/commit/8087f74bb080fb5c4d5db476ac65214c4be9bb43))
+
+
+### Documentation
+
+* add troubleshooting and coding standards from v0.1.8-v0.1.11 incident ([656de81](https://github.com/mtgibbs/pi-cluster-mcp/commit/656de81fbea6ab7d5467aaeea58a52d2d632d806))
+
 ## [0.1.11](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.10...homelab-mcp-v0.1.11) (2026-01-30)
 
 
