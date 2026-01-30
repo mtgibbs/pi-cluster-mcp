@@ -169,9 +169,11 @@ Only these deployments can be restarted via `restart_deployment`:
 
 | Item | Field | Purpose |
 |------|-------|---------|
-| `synology-mcp-ssh` | `private-key` | SSH key for NAS operations |
-| `jellyfin-api-key` | `api-key` | Jellyfin API for metadata refresh |
-| `mcp-homelab-api-key` | `api-key` | HTTP endpoint authentication |
+| `mcp-homelab` | `api-key` | HTTP endpoint authentication |
+| `mcp-homelab` | `nas-private-key` | SSH key for NAS operations |
+| `mcp-homelab` | `jellyfin-api-key` | Jellyfin API for metadata refresh |
+| `mcp-homelab` | `pihole-password` | Pi-hole v6 web password for API auth |
+| `mcp-homelab` | `immich-api-key` | Immich API for media operations |
 
 ## Development
 

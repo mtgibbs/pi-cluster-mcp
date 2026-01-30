@@ -53,12 +53,12 @@ spec:
                   name: mcp-homelab-secrets
                   key: jellyfin-api-key
 
-            # Pi-hole API
-            - name: PIHOLE_API_TOKEN
+            # Pi-hole API (v6 uses password-based session auth)
+            - name: PIHOLE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mcp-homelab-secrets
-                  key: pihole-api-token
+                  key: pihole-password
 
             # Immich API
             - name: IMMICH_API_KEY
