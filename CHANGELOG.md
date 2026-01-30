@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.14...homelab-mcp-v0.1.15) (2026-01-30)
+
+
+### Documentation
+
+* improve tool descriptions with usage intent ([#21](https://github.com/mtgibbs/pi-cluster-mcp/issues/21)) ([878f7ff](https://github.com/mtgibbs/pi-cluster-mcp/commit/878f7ffccc4c39f112b054996c87f27825022a78))
+
 ## [0.1.14](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.13...homelab-mcp-v0.1.14) (2026-01-30)
 
 
