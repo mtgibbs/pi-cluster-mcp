@@ -264,3 +264,79 @@ export const myNewTool: Tool = {
 - Check ClusterRole has required verb/resource
 - Check ClusterRoleBinding references correct ServiceAccount
 - For deployment restart, verify it's in the whitelist
+
+### MCP tools return "Server not initialized"
+This error means the client is using a stale session ID after the server restarted.
+
+**Cause**: MCP Streamable HTTP uses sessions. When the server pod restarts (new deployment, crash, node migration), existing session IDs become invalid. The client may still be holding the old session ID.
+
+**Solution**: Start a fresh Claude Code session (`claude` in a new terminal). The new session will perform proper initialization handshake.
+
+**Note**: This is a client-side issue, not a server bug. If you see this after deploying a new version, don't assume the code is broken - test with a fresh session first.
+
+### Tool returns "[object Object]" in error message
+This indicates improper error serialization. K8s client errors are often plain objects, not Error instances.
+
+**Pattern to avoid**:
+```typescript
+// BAD: String(err) returns "[object Object]" for objects
+const msg = err instanceof Error ? err.message : String(err);
+```
+
+**Correct pattern**:
+```typescript
+// GOOD: Properly handle K8s error structure
+if (err instanceof Error) {
+  msg = err.message;
+} else if (err && typeof err === 'object') {
+  const asRecord = err as Record<string, unknown>;
+  // K8s errors often have: { response: { body: { message: '...' } } }
+  if (asRecord.response?.body?.message) {
+    msg = asRecord.response.body.message;
+  } else {
+    msg = JSON.stringify(err);
+  }
+} else {
+  msg = String(err);
+}
+```
+
+## Coding Standards
+
+### Error Handling
+
+**K8s Client Errors**: The `@kubernetes/client-node` library throws objects with nested structure, not standard Error instances. Always check for:
+- `err.response.body.message` - The actual error message from K8s API
+- `err.statusCode` - HTTP status code
+- `err.body` - Response body (may be string or object)
+
+See `src/utils/errors.ts` for the canonical `k8sError()` helper.
+
+**Never use `String(obj)`** for unknown error types - it returns `[object Object]`. Use `JSON.stringify()` for objects.
+
+**Nullable responses**: K8s API responses can return `undefined` or `null` for empty results (e.g., empty logs). Always use nullish coalescing:
+```typescript
+return response.body ?? '';  // Not just response.body
+```
+
+### Testing After Deployment
+
+When deploying a new version:
+1. Wait for pod to become Ready
+2. **Start a fresh Claude Code session** (critical for HTTP transport)
+3. Test basic tools (`get_cluster_health`) before complex ones
+4. Check pod logs if tools fail: `kubectl logs -n mcp-homelab deploy/mcp-homelab`
+
+### Incident Reference: v0.1.8-v0.1.11 Regression
+
+**Timeline**:
+- v0.1.8: Added error handling improvements, appeared broken after deploy
+- v0.1.9: Incorrectly reverted changes (misdiagnosed as code bug)
+- v0.1.10: Re-applied changes, discovered actual bug: `String(err)` → `[object Object]`
+- v0.1.11: Fixed with proper object serialization
+
+**Lessons**:
+1. "Server not initialized" after deploy = stale client session, not code bug
+2. Always test with fresh Claude Code session after server restart
+3. Never use `String()` for unknown error types
+4. K8s errors need special handling - they're not Error instances
