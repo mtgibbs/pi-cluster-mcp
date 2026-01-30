@@ -143,7 +143,31 @@ export async function execInPod(
       }
     ).catch((err) => {
       // Enhance error message with context
-      const errMsg = err instanceof Error ? err.message : String(err);
+      // K8s client errors may be objects with nested structure, not Error instances
+      let errMsg: string;
+      if (err instanceof Error) {
+        errMsg = err.message;
+      } else if (err && typeof err === 'object') {
+        // K8s client often returns { response: { body: { message: '...' } } }
+        const asRecord = err as Record<string, unknown>;
+        if (asRecord.response && typeof asRecord.response === 'object') {
+          const resp = asRecord.response as Record<string, unknown>;
+          if (resp.body && typeof resp.body === 'object') {
+            const body = resp.body as Record<string, unknown>;
+            if (typeof body.message === 'string') {
+              errMsg = body.message;
+            } else {
+              errMsg = JSON.stringify(resp.body);
+            }
+          } else {
+            errMsg = JSON.stringify(err);
+          }
+        } else {
+          errMsg = JSON.stringify(err);
+        }
+      } else {
+        errMsg = String(err);
+      }
       const enhancedErr = new Error(`exec failed for ${namespace}/${podName}/${container}: ${errMsg}`);
       reject(enhancedErr);
     });
