@@ -23,7 +23,7 @@ interface FluxListResponse {
 
 const getFluxStatus: Tool = {
   name: 'get_flux_status',
-  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases',
+  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -63,7 +63,7 @@ const getFluxStatus: Tool = {
 
 const reconcileFlux: Tool = {
   name: 'reconcile_flux',
-  description: 'Trigger Flux reconciliation for a specific resource or all resources',
+  description: 'Trigger Flux reconciliation for a specific resource or all resources. Use this to force an immediate sync of GitOps resources.',
   inputSchema: {
     type: 'object',
     properties: {

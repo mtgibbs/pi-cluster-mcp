@@ -8,7 +8,7 @@ import * as k8s from '@kubernetes/client-node';
 
 const getMediaStatus: Tool = {
   name: 'get_media_status',
-  description: 'Get media services health (Jellyfin, Immich) including library stats and active sessions',
+  description: 'Get media services health (Jellyfin, Immich) including library stats and active sessions. Check this if media services are down.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -99,7 +99,7 @@ const getMediaStatus: Tool = {
 
 const fixJellyfinMetadata: Tool = {
   name: 'fix_jellyfin_metadata',
-  description: 'Search for a media item in Jellyfin and trigger a metadata refresh',
+  description: 'Search for a media item in Jellyfin and trigger a metadata refresh. Use this when media items have incorrect or missing info.',
   inputSchema: {
     type: 'object',
     properties: {
