@@ -103,6 +103,8 @@ export async function getCustomResource(
   return response.body;
 }
 
+const EXEC_TIMEOUT_MS = 30000; // 30 second timeout for exec
+
 export async function execInPod(
   namespace: string,
   podName: string,
@@ -115,6 +117,19 @@ export async function execInPod(
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
+    let resolved = false;
+
+    // Timeout handler
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error(`exec timed out after ${EXEC_TIMEOUT_MS}ms for ${namespace}/${podName}/${container}`));
+      }
+    }, EXEC_TIMEOUT_MS);
+
+    const cleanup = (): void => {
+      clearTimeout(timeout);
+    };
 
     // Use passthrough streams that collect output
     const stdoutStream = new PassThrough();
@@ -138,38 +153,74 @@ export async function execInPod(
       null,
       false,
       (status: k8s.V1Status) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
         const exitCode = status.status === 'Success' ? 0 : 1;
         resolve({ stdout, stderr, exitCode });
       }
-    ).catch((err) => {
+    ).then((websocket) => {
+      // Handle WebSocket events for better error detection
+      if (websocket) {
+        websocket.on('error', (err: Error) => {
+          if (resolved) return;
+          resolved = true;
+          cleanup();
+          reject(new Error(`exec WebSocket error for ${namespace}/${podName}/${container}: ${err.message}`));
+        });
+
+        websocket.on('close', (code: number, reason: string) => {
+          // If we haven't resolved yet and the connection closed, something went wrong
+          if (!resolved && code !== 1000) {
+            resolved = true;
+            cleanup();
+            reject(new Error(`exec WebSocket closed unexpectedly for ${namespace}/${podName}/${container}: code=${code} reason=${reason || 'unknown'}`));
+          }
+        });
+      }
+    }).catch((err) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+
       // Enhance error message with context
       // K8s client errors may be objects with nested structure, not Error instances
       let errMsg: string;
       if (err instanceof Error) {
         errMsg = err.message;
       } else if (err && typeof err === 'object') {
-        // K8s client often returns { response: { body: { message: '...' } } }
-        const asRecord = err as Record<string, unknown>;
-        if (asRecord.response && typeof asRecord.response === 'object') {
-          const resp = asRecord.response as Record<string, unknown>;
-          if (resp.body && typeof resp.body === 'object') {
-            const body = resp.body as Record<string, unknown>;
-            if (typeof body.message === 'string') {
-              errMsg = body.message;
+        // Check for empty object - common WebSocket failure mode
+        const errObj = err as Record<string, unknown>;
+        const keys = Object.keys(errObj);
+        if (keys.length === 0) {
+          errMsg = 'WebSocket connection failed (empty error - check network policies and RBAC)';
+        } else {
+          // K8s client often returns { response: { body: { message: '...' } } }
+          const asRecord = err as Record<string, unknown>;
+          if (asRecord.response && typeof asRecord.response === 'object') {
+            const resp = asRecord.response as Record<string, unknown>;
+            if (resp.body && typeof resp.body === 'object') {
+              const body = resp.body as Record<string, unknown>;
+              if (typeof body.message === 'string') {
+                errMsg = body.message;
+              } else {
+                errMsg = JSON.stringify(resp.body);
+              }
+            } else if (typeof resp.body === 'string') {
+              errMsg = resp.body;
             } else {
-              errMsg = JSON.stringify(resp.body);
+              errMsg = JSON.stringify(err);
             }
+          } else if (asRecord.message) {
+            errMsg = String(asRecord.message);
           } else {
             errMsg = JSON.stringify(err);
           }
-        } else {
-          errMsg = JSON.stringify(err);
         }
       } else {
         errMsg = String(err);
       }
-      const enhancedErr = new Error(`exec failed for ${namespace}/${podName}/${container}: ${errMsg}`);
-      reject(enhancedErr);
+      reject(new Error(`exec failed for ${namespace}/${podName}/${container}: ${errMsg}`));
     });
   });
 }
