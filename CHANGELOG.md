@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.12...homelab-mcp-v0.1.13) (2026-01-30)
+
+
+### Features
+
+* rewrite Pi-hole client for v6 API ([056b9c7](https://github.com/mtgibbs/pi-cluster-mcp/commit/056b9c78a97882c460a7211dd9d51d991b154e1b))
+
 ## [0.1.12](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.11...homelab-mcp-v0.1.12) (2026-01-30)
 
 
