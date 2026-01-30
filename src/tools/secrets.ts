@@ -34,7 +34,7 @@ const getSecretsStatus: Tool = {
     try {
       const api = getCustomObjectsApi();
 
-      const response = await api.listClusterCustomObject('external-secrets.io', 'v1beta1', 'externalsecrets');
+      const response = await api.listClusterCustomObject('external-secrets.io', 'v1', 'externalsecrets');
       const externalSecrets = response.body as ExternalSecretList;
 
       const secrets = externalSecrets.items.map((es) => {
@@ -94,7 +94,7 @@ const refreshSecret: Tool = {
       };
 
       await api.patchNamespacedCustomObject(
-        'external-secrets.io', 'v1beta1', namespace, 'externalsecrets', name, patch,
+        'external-secrets.io', 'v1', namespace, 'externalsecrets', name, patch,
         undefined, undefined, undefined,
         { headers: { 'Content-Type': 'application/merge-patch+json' } }
       );
