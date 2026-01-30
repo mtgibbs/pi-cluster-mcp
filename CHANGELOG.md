@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.9...homelab-mcp-v0.1.10) (2026-01-30)
+
+
+### Features
+
+* re-apply error handling improvements ([a857785](https://github.com/mtgibbs/pi-cluster-mcp/commit/a85778561604f9dc14265569d551c82065493a54))
+
 ## [0.1.9](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.8...homelab-mcp-v0.1.9) (2026-01-29)
 
 
