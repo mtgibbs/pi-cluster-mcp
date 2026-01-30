@@ -24,7 +24,7 @@ function parseSinceToSeconds(since: string): number | null {
 
 const getPodLogs: Tool = {
   name: 'get_pod_logs',
-  description: 'Get logs from a pod, with support for container selection, line limits, time filtering, and previous container logs',
+  description: 'Get logs from a pod, with support for container selection, line limits, time filtering, and previous container logs. Essential for debugging application errors. Supports fuzzy matching for pod names.',
   inputSchema: {
     type: 'object',
     properties: {

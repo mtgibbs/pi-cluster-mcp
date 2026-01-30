@@ -91,7 +91,7 @@ const getDnsStatus: Tool = {
 
 const testDnsQuery: Tool = {
   name: 'test_dns_query',
-  description: 'Test DNS resolution by running dig against Pi-hole',
+  description: 'Test DNS resolution by running dig against Pi-hole. Verify if internal/external DNS resolution is working from within the cluster.',
   inputSchema: {
     type: 'object',
     properties: {

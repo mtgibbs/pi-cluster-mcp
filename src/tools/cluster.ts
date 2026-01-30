@@ -5,7 +5,7 @@ import { notAllowedError, k8sError } from '../utils/errors.js';
 
 const getClusterHealth: Tool = {
   name: 'get_cluster_health',
-  description: 'Get overall cluster health including nodes, resource usage, problem pods, and warning events',
+  description: 'Get overall cluster health including nodes, resource usage, problem pods, and warning events. Use this as a starting point to diagnose cluster issues.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -63,7 +63,7 @@ const getClusterHealth: Tool = {
 
 const restartDeployment: Tool = {
   name: 'restart_deployment',
-  description: `Perform a rolling restart of a whitelisted deployment. Allowed: ${getAllowedDeployments().join(', ')}`,
+  description: `Perform a rolling restart of a whitelisted deployment. Use this to fix stuck pods or apply config changes manually. Allowed: ${getAllowedDeployments().join(', ')}`,
   inputSchema: {
     type: 'object',
     properties: {
