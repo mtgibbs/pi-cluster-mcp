@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.10...homelab-mcp-v0.1.11) (2026-01-30)
+
+
+### Bug Fixes
+
+* properly serialize non-Error objects in exec error handling ([#13](https://github.com/mtgibbs/pi-cluster-mcp/issues/13)) ([20395c2](https://github.com/mtgibbs/pi-cluster-mcp/commit/20395c29b67bbe8b3b82b29bceedc431b8ca3306))
+
 ## [0.1.10](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.9...homelab-mcp-v0.1.10) (2026-01-30)
 
 
