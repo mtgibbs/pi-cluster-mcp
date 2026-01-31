@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.16...homelab-mcp-v0.1.17) (2026-01-31)
+
+
+### Bug Fixes
+
+* add debug logging for exec WebSocket failures ([47e3b51](https://github.com/mtgibbs/pi-cluster-mcp/commit/47e3b51abb6239109daf1027df160478665ab5d5))
+
 ## [0.1.16](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.15...homelab-mcp-v0.1.16) (2026-01-30)
 
 
