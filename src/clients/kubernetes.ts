@@ -179,6 +179,10 @@ export async function execInPod(
         });
       }
     }).catch((err) => {
+      // DEBUG: Log raw error before transformation to diagnose WebSocket failures
+      console.error(`[execInPod] Raw error for ${namespace}/${podName}/${container}:`, JSON.stringify(err, Object.getOwnPropertyNames(err || {}), 2));
+      console.error(`[execInPod] Error type: ${typeof err}, constructor: ${err?.constructor?.name}`);
+
       if (resolved) return;
       resolved = true;
       cleanup();
