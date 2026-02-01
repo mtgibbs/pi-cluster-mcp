@@ -180,8 +180,28 @@ export async function execInPod(
       }
     }).catch((err) => {
       // DEBUG: Log raw error before transformation to diagnose WebSocket failures
-      console.error(`[execInPod] Raw error for ${namespace}/${podName}/${container}:`, JSON.stringify(err, Object.getOwnPropertyNames(err || {}), 2));
-      console.error(`[execInPod] Error type: ${typeof err}, constructor: ${err?.constructor?.name}`);
+      console.error(`[execInPod] Raw error for ${namespace}/${podName}/${container}:`);
+      console.error(`  Type: ${typeof err}, Constructor: ${err?.constructor?.name}`);
+
+      // ErrorEvent properties are on the prototype, not own properties, so we must access them directly
+      if (err?.constructor?.name === 'ErrorEvent') {
+        const evt = err as unknown as { message?: string; error?: Error; type?: string; target?: unknown };
+        console.error(`  ErrorEvent.type: ${evt.type}`);
+        console.error(`  ErrorEvent.message: ${evt.message}`);
+        console.error(`  ErrorEvent.error: ${evt.error}`);
+        if (evt.target && typeof evt.target === 'object') {
+          const target = evt.target as { url?: string; readyState?: number };
+          console.error(`  ErrorEvent.target.url: ${target.url}`);
+          console.error(`  ErrorEvent.target.readyState: ${target.readyState}`);
+        }
+      } else {
+        // For non-ErrorEvent, try JSON stringify
+        try {
+          console.error(`  JSON: ${JSON.stringify(err, Object.getOwnPropertyNames(err || {}), 2)}`);
+        } catch {
+          console.error(`  Could not stringify error`);
+        }
+      }
 
       if (resolved) return;
       resolved = true;
@@ -190,7 +210,18 @@ export async function execInPod(
       // Enhance error message with context
       // K8s client errors may be objects with nested structure, not Error instances
       let errMsg: string;
-      if (err instanceof Error) {
+
+      // Handle WebSocket ErrorEvent specifically
+      if (err?.constructor?.name === 'ErrorEvent') {
+        const evt = err as unknown as { message?: string; error?: Error; type?: string };
+        if (evt.message) {
+          errMsg = `WebSocket error: ${evt.message}`;
+        } else if (evt.error?.message) {
+          errMsg = `WebSocket error: ${evt.error.message}`;
+        } else {
+          errMsg = 'WebSocket connection failed (ErrorEvent with no details - likely TLS or connection refused)';
+        }
+      } else if (err instanceof Error) {
         errMsg = err.message;
       } else if (err && typeof err === 'object') {
         // Check for empty object - common WebSocket failure mode
