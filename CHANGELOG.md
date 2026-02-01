@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.17...homelab-mcp-v0.1.18) (2026-02-01)
+
+
+### Bug Fixes
+
+* properly extract WebSocket ErrorEvent properties in exec logging ([15a764f](https://github.com/mtgibbs/pi-cluster-mcp/commit/15a764f3f66f7a2beab81fb55a2bd4a8b0e88a3a))
+
 ## [0.1.17](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.16...homelab-mcp-v0.1.17) (2026-01-31)
 
 
