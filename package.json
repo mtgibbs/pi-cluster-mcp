@@ -1,6 +1,6 @@
 {
   "name": "homelab-mcp",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "MCP server for Pi K3s cluster operations",
   "type": "module",
   "main": "dist/index.js",
