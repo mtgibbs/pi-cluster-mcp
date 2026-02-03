@@ -128,6 +128,68 @@ Only these deployments can be restarted via `restart_deployment`:
 - `homepage/homepage`
 - `uptime-kuma/uptime-kuma`
 
+### Exec Tools Security
+
+The exec-based tools (`test_dns_query`, `curl_ingress`, `test_pod_connectivity`, `get_node_networking`, `get_iptables_rules`, `get_conntrack_entries`) run commands inside cluster pods via the K8s exec API. Security is maintained through multiple layers:
+
+**Input Validation:**
+| Tool | Validation |
+|------|------------|
+| `test_dns_query` | Domain: strict alphanumeric regex, Type: whitelist (A, AAAA, MX, etc.) |
+| `curl_ingress` | URL parsed with `new URL()`, protocol must be http/https |
+| `test_pod_connectivity` | IP/hostname regex, port: integer 1-65535 |
+| `get_node_networking` | Node validated against actual cluster nodes |
+| `get_iptables_rules` | Node validated, table whitelisted, chain regex |
+| `get_conntrack_entries` | Node validated, filter: alphanumeric with dots/colons |
+
+**Command Construction:**
+All commands use array format (not shell strings), preventing injection:
+```typescript
+['dig', '+short', queryType, domain]  // Safe - no shell interpretation
+```
+
+**Threat Model - What Malicious Prompts CANNOT Do:**
+- Run arbitrary commands (hardcoded command templates)
+- Escape to shell (array format prevents metachar interpretation)
+- Read/write files (no filesystem access)
+- Modify iptables (only `iptables-save` for reading, not `iptables`)
+- Delete K8s resources (no destructive operations)
+
+**What Malicious Prompts COULD Do (by design):**
+- Information gathering (network topology, firewall rules) - this is the intended purpose
+- SSRF via curl_ingress - but that's the tool's explicit function
+- DNS reconnaissance - limited by strict domain regex
+
+### Debug-Agent Deployment Requirements
+
+The debug-agent DaemonSet requires specific container capabilities to function:
+
+```yaml
+securityContext:
+  privileged: false
+  capabilities:
+    drop: [ALL]
+    add:
+      - NET_ADMIN  # Required for: iptables-save, conntrack
+      - NET_RAW    # Required for: ping
+hostNetwork: true    # Required for: node network visibility
+```
+
+**Note:** `hostPID` and `privileged: true` are NOT required and should not be used.
+
+### RBAC for Exec Tools
+
+The `pods/exec` permission requires **both `create` and `get` verbs** for the WebSocket connection:
+
+```yaml
+rules:
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create, get]  # Both required!
+```
+
+Namespace-scoped Roles are used to limit exec access to specific namespaces (pihole, jellyfin, mcp-homelab).
+
 ## Tools Reference
 
 ### Diagnostic Tools (Read-Only)
