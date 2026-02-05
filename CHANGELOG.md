@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.19](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.18...homelab-mcp-v0.1.19) (2026-02-05)
+
+
+### Features
+
+* add PVC, CronJob, resource inspection tools and expand restart whitelist ([05a209c](https://github.com/mtgibbs/pi-cluster-mcp/commit/05a209cb91cf966e42a1d35bcc88ad82c2905cde))
+
+
+### Documentation
+
+* add feature requests from ebook stack session ([e035ac7](https://github.com/mtgibbs/pi-cluster-mcp/commit/e035ac7a9087a0c143803f49ba59cca5b53aa6d3))
+* add pod file template system design ([f4e9047](https://github.com/mtgibbs/pi-cluster-mcp/commit/f4e90476366d74c84512e1983f0a420bfe3e542f))
+* add security model documentation for exec tools ([61d56c7](https://github.com/mtgibbs/pi-cluster-mcp/commit/61d56c7f3ae87a90201496ad7556802f84be7fec))
+
 ## [0.1.18](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.17...homelab-mcp-v0.1.18) (2026-02-01)
 
 
