@@ -55,12 +55,14 @@ homelab-mcp/
 │   │   ├── flux.ts              # get_flux_status, reconcile_flux
 │   │   ├── certificates.ts      # get_certificate_status
 │   │   ├── secrets.ts           # get_secrets_status, refresh_secret
-│   │   ├── backups.ts           # get_backup_status, trigger_backup
+│   │   ├── backups.ts           # get_backup_status, trigger_backup, get_cronjob_details, get_job_logs
 │   │   ├── ingress.ts           # get_ingress_status
 │   │   ├── tailscale.ts         # get_tailscale_status
 │   │   ├── media.ts             # get_media_status, fix_jellyfin_metadata
 │   │   ├── networking.ts        # get_node_networking, get_iptables_rules, etc.
-│   │   └── logs.ts              # get_pod_logs
+│   │   ├── logs.ts              # get_pod_logs
+│   │   ├── storage.ts           # get_pvcs
+│   │   └── resources.ts         # describe_resource
 │   └── utils/
 │       ├── errors.ts            # Structured error responses
 │       ├── whitelist.ts         # Allowed deployments for restart
@@ -127,6 +129,18 @@ Only these deployments can be restarted via `restart_deployment`:
 - `immich/immich-server`
 - `homepage/homepage`
 - `uptime-kuma/uptime-kuma`
+- `media/lazylibrarian`
+- `media/calibre-web`
+- `media/sabnzbd`
+- `media/prowlarr`
+- `media/sonarr`
+- `media/radarr`
+- `media/qbittorrent`
+- `media/bazarr`
+- `media/readarr`
+- `media/lidarr`
+- `media/jellyseerr`
+- `media/flaresolverr`
 
 ### Exec Tools Security
 
@@ -190,6 +204,14 @@ rules:
 
 Namespace-scoped Roles are used to limit exec access to specific namespaces (pihole, jellyfin, mcp-homelab).
 
+### Environment Variable Redaction
+
+The `describe_resource` and `get_cronjob_details` tools sanitize environment variables to prevent secret leakage:
+- `valueFrom.secretKeyRef` → displayed as `'secret (redacted)'`
+- `envFrom` with `secretRef` → displayed as `'secret (redacted)'`
+- Plain values and `configMapRef` sources are shown normally
+- ConfigMap data values in `describe_resource` are previewed (first 200 chars) to avoid dumping large configs
+
 ## Tools Reference
 
 ### Diagnostic Tools (Read-Only)
@@ -211,6 +233,9 @@ Namespace-scoped Roles are used to limit exec access to specific namespaces (pih
 | `get_iptables_rules` | Firewall rules | iptables/ip6tables rules per table/chain on a node |
 | `get_conntrack_entries` | Connection tracking | Active connections with NAT, states, marks |
 | `get_pod_logs` | Pod log retrieval | Tail logs with container, time, and line filtering |
+| `get_pvcs` | PVC storage status | PVC list with status, capacity, storage class, bound volume |
+| `get_cronjob_details` | CronJob inspection | Schedule, job template, containers, volumes (secrets redacted) |
+| `describe_resource` | Generic resource inspect | List or detail view of deployments, statefulsets, daemonsets, pods, services, configmaps |
 
 ### Action Tools
 
@@ -226,6 +251,7 @@ Namespace-scoped Roles are used to limit exec access to specific namespaces (pih
 | `touch_nas_path` | `path` | SSH to Synology, touch path |
 | `curl_ingress` | `url`, `timeout?`, `fromNode?` | Test HTTP(S) from within cluster |
 | `test_pod_connectivity` | `sourceNode`, `target`, `port?` | Ping + TCP port check from a node |
+| `get_job_logs` | `namespace`, `job`, `lines?` | Get logs from all pods of a Job |
 
 ## Secrets Required (1Password)
 

@@ -5,6 +5,18 @@ export const ALLOWED_DEPLOYMENTS = new Set([
   'immich/immich-server',
   'homepage/homepage',
   'uptime-kuma/uptime-kuma',
+  'media/lazylibrarian',
+  'media/calibre-web',
+  'media/sabnzbd',
+  'media/prowlarr',
+  'media/sonarr',
+  'media/radarr',
+  'media/qbittorrent',
+  'media/bazarr',
+  'media/readarr',
+  'media/lidarr',
+  'media/jellyseerr',
+  'media/flaresolverr',
 ]);
 
 export function isDeploymentAllowed(namespace: string, name: string): boolean {

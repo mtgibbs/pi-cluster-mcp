@@ -33,10 +33,17 @@ describe('tool registry', () => {
     expect(toolNames).toContain('test_pod_connectivity');
     // Log tools
     expect(toolNames).toContain('get_pod_logs');
+    // Storage tools
+    expect(toolNames).toContain('get_pvcs');
+    // Resource inspection tools
+    expect(toolNames).toContain('describe_resource');
+    // CronJob/Job tools
+    expect(toolNames).toContain('get_cronjob_details');
+    expect(toolNames).toContain('get_job_logs');
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(25);
+    expect(tools).toHaveLength(29);
   });
 
   it('has no duplicate tool names', () => {
@@ -72,8 +79,10 @@ describe('deployment whitelist', () => {
 
   it('returns all allowed deployments', () => {
     const allowed = getAllowedDeployments();
-    expect(allowed).toHaveLength(6);
+    expect(allowed).toHaveLength(18);
     expect(allowed).toContain('jellyfin/jellyfin');
+    expect(allowed).toContain('media/sonarr');
+    expect(allowed).toContain('media/radarr');
   });
 });
 

@@ -9,6 +9,8 @@ import { tailscaleTools } from './tailscale.js';
 import { mediaTools } from './media.js';
 import { networkingTools } from './networking.js';
 import { logsTools } from './logs.js';
+import { storageTools } from './storage.js';
+import { resourceTools } from './resources.js';
 
 export interface Tool {
   name: string;
@@ -33,6 +35,8 @@ export const tools: Tool[] = [
   ...mediaTools,
   ...networkingTools,
   ...logsTools,
+  ...storageTools,
+  ...resourceTools,
 ];
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));
