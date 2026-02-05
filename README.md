@@ -8,8 +8,10 @@ This server provides a safe, structured interface for LLMs (like Claude) to inte
 
 ### Kubernetes Operations
 - **Health Checks:** Monitor nodes, resource usage, and problem pods.
-- **Safe Restarts:** Trigger rolling restarts for whitelisted deployments (e.g., Jellyfin, Pi-hole).
-- **Backups:** Check status of CronJobs and manually trigger backup jobs.
+- **Resource Inspection:** List and describe deployments, statefulsets, daemonsets, pods, services, and configmaps with full spec details.
+- **Storage:** Inspect PersistentVolumeClaims with status, capacity, and storage class info.
+- **Safe Restarts:** Trigger rolling restarts for whitelisted deployments (e.g., Jellyfin, Pi-hole, media stack).
+- **Backups:** Check CronJob status, inspect detailed job specs, retrieve job pod logs, and manually trigger backup jobs.
 - **GitOps:** Monitor Flux Kustomizations/HelmReleases and trigger reconciliation.
 - **Secrets:** View External Secrets sync status and force refreshes (1Password integration).
 
@@ -104,8 +106,10 @@ The server is designed to be deployed as a Pod in your cluster.
 | **DNS** | `get_dns_status`, `test_dns_query`, `update_pihole_gravity`, `get_pihole_whitelist`, `get_pihole_queries` |
 | **GitOps** | `get_flux_status`, `reconcile_flux` |
 | **Media** | `get_media_status`, `fix_jellyfin_metadata` |
-| **Backups** | `get_backup_status`, `trigger_backup` |
+| **Backups** | `get_backup_status`, `trigger_backup`, `get_cronjob_details`, `get_job_logs` |
 | **Secrets** | `get_secrets_status`, `refresh_secret` |
+| **Storage** | `get_pvcs` |
+| **Resources** | `describe_resource` |
 | **System** | `get_certificate_status`, `get_ingress_status`, `touch_nas_path` |
 | **Networking** | `get_node_networking`, `get_iptables_rules`, `get_conntrack_entries`, `curl_ingress`, `test_pod_connectivity` |
 | **Logs** | `get_pod_logs` |
