@@ -178,17 +178,19 @@ export async function execInPod(
           }
         });
       }
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       // DEBUG: Log raw error before transformation to diagnose WebSocket failures
       console.error(`[execInPod] Raw error for ${namespace}/${podName}/${container}:`);
-      console.error(`  Type: ${typeof err}, Constructor: ${err?.constructor?.name}`);
+      const errObj = err as Record<string, unknown> | null | undefined;
+      const constructorName = errObj?.constructor?.name;
+      console.error(`  Type: ${typeof err}, Constructor: ${String(constructorName ?? 'unknown')}`);
 
       // ErrorEvent properties are on the prototype, not own properties, so we must access them directly
-      if (err?.constructor?.name === 'ErrorEvent') {
-        const evt = err as unknown as { message?: string; error?: Error; type?: string; target?: unknown };
+      if (constructorName === 'ErrorEvent') {
+        const evt = err as { message?: string; error?: Error; type?: string; target?: unknown };
         console.error(`  ErrorEvent.type: ${evt.type}`);
         console.error(`  ErrorEvent.message: ${evt.message}`);
-        console.error(`  ErrorEvent.error: ${evt.error}`);
+        console.error(`  ErrorEvent.error: ${evt.error?.message ?? String(evt.error)}`);
         if (evt.target && typeof evt.target === 'object') {
           const target = evt.target as { url?: string; readyState?: number };
           console.error(`  ErrorEvent.target.url: ${target.url}`);
@@ -197,7 +199,7 @@ export async function execInPod(
       } else {
         // For non-ErrorEvent, try JSON stringify
         try {
-          console.error(`  JSON: ${JSON.stringify(err, Object.getOwnPropertyNames(err || {}), 2)}`);
+          console.error(`  JSON: ${JSON.stringify(err, Object.getOwnPropertyNames((err as object) || {}), 2)}`);
         } catch {
           console.error(`  Could not stringify error`);
         }
@@ -212,8 +214,8 @@ export async function execInPod(
       let errMsg: string;
 
       // Handle WebSocket ErrorEvent specifically
-      if (err?.constructor?.name === 'ErrorEvent') {
-        const evt = err as unknown as { message?: string; error?: Error; type?: string };
+      if (constructorName === 'ErrorEvent') {
+        const evt = err as { message?: string; error?: Error; type?: string };
         if (evt.message) {
           errMsg = `WebSocket error: ${evt.message}`;
         } else if (evt.error?.message) {
