@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.20](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.19...homelab-mcp-v0.1.20) (2026-02-06)
+
+
+### Features
+
+* add media stack API tools for Bazarr, Sonarr, Radarr, SABnzbd ([640e9ff](https://github.com/mtgibbs/pi-cluster-mcp/commit/640e9ff2650529c38829978d8f6ee317735617b3))
+
+
+### Bug Fixes
+
+* resolve eslint errors in kubernetes.ts error handling ([066b231](https://github.com/mtgibbs/pi-cluster-mcp/commit/066b231d1b42f67db68013825caa409a0cb72f34))
+
+
+### Documentation
+
+* update README with new v0.1.19 tools ([e97199e](https://github.com/mtgibbs/pi-cluster-mcp/commit/e97199e70a0e3f15125ddff91ab3d87302a7f9b4))
+
 ## [0.1.19](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.18...homelab-mcp-v0.1.19) (2026-02-05)
 
 
