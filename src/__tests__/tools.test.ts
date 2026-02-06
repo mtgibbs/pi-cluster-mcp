@@ -40,10 +40,30 @@ describe('tool registry', () => {
     // CronJob/Job tools
     expect(toolNames).toContain('get_cronjob_details');
     expect(toolNames).toContain('get_job_logs');
+    // Bazarr tools
+    expect(toolNames).toContain('get_subtitle_status');
+    expect(toolNames).toContain('get_subtitle_history');
+    expect(toolNames).toContain('search_subtitles');
+    // Sonarr tools
+    expect(toolNames).toContain('get_sonarr_queue');
+    expect(toolNames).toContain('get_sonarr_history');
+    expect(toolNames).toContain('search_sonarr_episode');
+    // Radarr tools
+    expect(toolNames).toContain('get_radarr_queue');
+    expect(toolNames).toContain('get_radarr_history');
+    expect(toolNames).toContain('search_radarr_movie');
+    // SABnzbd tools
+    expect(toolNames).toContain('get_sabnzbd_queue');
+    expect(toolNames).toContain('get_sabnzbd_history');
+    expect(toolNames).toContain('retry_sabnzbd_download');
+    expect(toolNames).toContain('pause_resume_sabnzbd');
+    // Arr shared tools
+    expect(toolNames).toContain('get_quality_profile');
+    expect(toolNames).toContain('reject_and_search');
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(29);
+    expect(tools).toHaveLength(44);
   });
 
   it('has no duplicate tool names', () => {

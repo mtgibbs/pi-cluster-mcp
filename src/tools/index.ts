@@ -11,6 +11,11 @@ import { networkingTools } from './networking.js';
 import { logsTools } from './logs.js';
 import { storageTools } from './storage.js';
 import { resourceTools } from './resources.js';
+import { bazarrTools } from './bazarr.js';
+import { sonarrTools } from './sonarr.js';
+import { radarrTools } from './radarr.js';
+import { sabnzbdTools } from './sabnzbd.js';
+import { arrSharedTools } from './arr-shared.js';
 
 export interface Tool {
   name: string;
@@ -37,6 +42,11 @@ export const tools: Tool[] = [
   ...logsTools,
   ...storageTools,
   ...resourceTools,
+  ...bazarrTools,
+  ...sonarrTools,
+  ...radarrTools,
+  ...sabnzbdTools,
+  ...arrSharedTools,
 ];
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));

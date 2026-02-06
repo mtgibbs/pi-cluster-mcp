@@ -47,7 +47,11 @@ homelab-mcp/
 │   ├── auth.ts                  # API key validation middleware
 │   ├── clients/
 │   │   ├── kubernetes.ts        # K8s client wrapper
-│   │   └── synology.ts          # SSH client for NAS
+│   │   ├── synology.ts          # SSH client for NAS
+│   │   ├── bazarr.ts            # Bazarr subtitle API client
+│   │   ├── sonarr.ts            # Sonarr v3 API client
+│   │   ├── radarr.ts            # Radarr v3 API client
+│   │   └── sabnzbd.ts           # SABnzbd API client
 │   ├── tools/
 │   │   ├── index.ts             # Tool registry
 │   │   ├── cluster.ts           # get_cluster_health, restart_deployment
@@ -62,7 +66,12 @@ homelab-mcp/
 │   │   ├── networking.ts        # get_node_networking, get_iptables_rules, etc.
 │   │   ├── logs.ts              # get_pod_logs
 │   │   ├── storage.ts           # get_pvcs
-│   │   └── resources.ts         # describe_resource
+│   │   ├── resources.ts         # describe_resource
+│   │   ├── bazarr.ts            # Bazarr subtitle tools
+│   │   ├── sonarr.ts            # Sonarr queue/history/search
+│   │   ├── radarr.ts            # Radarr queue/history/search
+│   │   ├── sabnzbd.ts           # SABnzbd queue/history/control
+│   │   └── arr-shared.ts        # Shared Sonarr/Radarr tools
 │   └── utils/
 │       ├── errors.ts            # Structured error responses
 │       ├── whitelist.ts         # Allowed deployments for restart
@@ -236,6 +245,15 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `get_pvcs` | PVC storage status | PVC list with status, capacity, storage class, bound volume |
 | `get_cronjob_details` | CronJob inspection | Schedule, job template, containers, volumes (secrets redacted) |
 | `describe_resource` | Generic resource inspect | List or detail view of deployments, statefulsets, daemonsets, pods, services, configmaps |
+| `get_subtitle_status` | Bazarr subtitle status | Wanted subtitles for series and movies |
+| `get_subtitle_history` | Bazarr subtitle history | Recent subtitle downloads and upgrades |
+| `get_sonarr_queue` | Sonarr download queue | Downloading, stuck, or failed TV episodes |
+| `get_sonarr_history` | Sonarr grab history | Recent TV episode grabs/downloads/imports |
+| `get_radarr_queue` | Radarr download queue | Downloading, stuck, or failed movies |
+| `get_radarr_history` | Radarr grab history | Recent movie grabs/downloads/imports |
+| `get_sabnzbd_queue` | SABnzbd download queue | Active downloads with speed, ETA, priority |
+| `get_sabnzbd_history` | SABnzbd download history | Completed and failed downloads |
+| `get_quality_profile` | Sonarr/Radarr profiles | Quality levels and allowed qualities |
 
 ### Action Tools
 
@@ -252,6 +270,12 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `curl_ingress` | `url`, `timeout?`, `fromNode?` | Test HTTP(S) from within cluster |
 | `test_pod_connectivity` | `sourceNode`, `target`, `port?` | Ping + TCP port check from a node |
 | `get_job_logs` | `namespace`, `job`, `lines?` | Get logs from all pods of a Job |
+| `search_subtitles` | `service`, `id` | Trigger subtitle search in Bazarr |
+| `search_sonarr_episode` | `episodeId` | Manual search for episode releases |
+| `search_radarr_movie` | `movieId` | Manual search for movie releases |
+| `retry_sabnzbd_download` | `nzoId` | Retry failed download in SABnzbd |
+| `pause_resume_sabnzbd` | `action`, `nzoId?` | Pause/resume queue or specific item |
+| `reject_and_search` | `service`, `queueId`, `blocklist?` | Reject queue item and re-search |
 
 ## Secrets Required (1Password)
 
@@ -262,6 +286,10 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `mcp-homelab` | `jellyfin-api-key` | Jellyfin API for metadata refresh |
 | `mcp-homelab` | `pihole-password` | Pi-hole v6 web password for API auth |
 | `mcp-homelab` | `immich-api-key` | Immich API for media operations |
+| `mcp-homelab` | `bazarr-api-key` | Bazarr API for subtitle operations |
+| `mcp-homelab` | `sonarr-api-key` | Sonarr API for TV management |
+| `mcp-homelab` | `radarr-api-key` | Radarr API for movie management |
+| `mcp-homelab` | `sabnzbd-api-key` | SABnzbd API for download management |
 
 ## Development
 

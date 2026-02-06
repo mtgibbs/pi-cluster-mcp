@@ -66,6 +66,14 @@ This project is built with a "defense in depth" approach:
 | `JELLYFIN_URL` | Internal URL for Jellyfin | No (default: cluster svc) |
 | `JELLYFIN_API_KEY` | API Key for Jellyfin operations | Yes (for Media tools) |
 | `IMMICH_API_KEY` | API Key for Immich stats | Yes (for Media tools) |
+| `BAZARR_URL` | Internal URL for Bazarr | No (default: cluster svc) |
+| `BAZARR_API_KEY` | API Key for Bazarr operations | Yes (for Subtitle tools) |
+| `SONARR_URL` | Internal URL for Sonarr | No (default: cluster svc) |
+| `SONARR_API_KEY` | API Key for Sonarr operations | Yes (for TV tools) |
+| `RADARR_URL` | Internal URL for Radarr | No (default: cluster svc) |
+| `RADARR_API_KEY` | API Key for Radarr operations | Yes (for Movie tools) |
+| `SABNZBD_URL` | Internal URL for SABnzbd | No (default: cluster svc) |
+| `SABNZBD_API_KEY` | API Key for SABnzbd operations | Yes (for Download tools) |
 
 ## 📦 Deployment
 
@@ -106,6 +114,11 @@ The server is designed to be deployed as a Pod in your cluster.
 | **DNS** | `get_dns_status`, `test_dns_query`, `update_pihole_gravity`, `get_pihole_whitelist`, `get_pihole_queries` |
 | **GitOps** | `get_flux_status`, `reconcile_flux` |
 | **Media** | `get_media_status`, `fix_jellyfin_metadata` |
+| **Subtitles** | `get_subtitle_status`, `get_subtitle_history`, `search_subtitles` |
+| **TV (Sonarr)** | `get_sonarr_queue`, `get_sonarr_history`, `search_sonarr_episode` |
+| **Movies (Radarr)** | `get_radarr_queue`, `get_radarr_history`, `search_radarr_movie` |
+| **Downloads (SABnzbd)** | `get_sabnzbd_queue`, `get_sabnzbd_history`, `retry_sabnzbd_download`, `pause_resume_sabnzbd` |
+| **Arr Shared** | `get_quality_profile`, `reject_and_search` |
 | **Backups** | `get_backup_status`, `trigger_backup`, `get_cronjob_details`, `get_job_logs` |
 | **Secrets** | `get_secrets_status`, `refresh_secret` |
 | **Storage** | `get_pvcs` |
