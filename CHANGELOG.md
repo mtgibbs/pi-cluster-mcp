@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.21](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.20...homelab-mcp-v0.1.21) (2026-03-02)
+
+
+### Features
+
+* **dns:** add diagnose_dns tool and expand restart whitelist ([5ab1d07](https://github.com/mtgibbs/pi-cluster-mcp/commit/5ab1d07173e2eff1bc1fcfb6370d5d527604ae41))
+
+
+### Bug Fixes
+
+* **dns:** resolve ESLint errors in diagnose_dns tool ([8f10581](https://github.com/mtgibbs/pi-cluster-mcp/commit/8f1058165f481f06848ffe62488690da03aebc52))
+
 ## [0.1.20](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.19...homelab-mcp-v0.1.20) (2026-02-06)
 
 
