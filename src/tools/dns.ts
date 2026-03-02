@@ -293,7 +293,7 @@ const diagnoseDns: Tool = {
       const podName = piholePod.metadata.name;
 
       // Helper to run dig and parse results
-      const runDig = async (args: string[]) => {
+      const runDig = async (args: string[]): Promise<{ answers: string[]; resolved: boolean; exitCode: number; stderr: string | undefined }> => {
         const result = await execInPod(PIHOLE_NAMESPACE, podName, PIHOLE_CONTAINER, ['dig', ...args]);
         const answers = result.stdout
           .trim()
@@ -376,7 +376,7 @@ const diagnoseDns: Tool = {
       }
 
       // Step 5: Fetch Unbound logs filtered for the queried domain
-      let unboundLogs: Record<string, string[]> = {};
+      const unboundLogs: Record<string, string[]> = {};
       try {
         const pods = await listPods(PIHOLE_NAMESPACE);
         const unboundPodList = pods.filter((p) => p.metadata?.name?.includes('unbound'));
