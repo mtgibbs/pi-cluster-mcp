@@ -1,5 +1,5 @@
 import type { Tool } from './index.js';
-import { listPods, execInPod, getReadyPod } from '../clients/kubernetes.js';
+import { listPods, execInPod, getReadyPod, readPodLog } from '../clients/kubernetes.js';
 import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
 import { k8sError, notFoundError } from '../utils/errors.js';
 
@@ -245,4 +245,193 @@ const getPiholeQueries: Tool = {
   },
 };
 
-export const dnsTools = [getDnsStatus, testDnsQuery, updatePiholeGravity, getPiholeWhitelist, getPiholeQueries];
+const diagnoseDns: Tool = {
+  name: 'diagnose_dns',
+  description:
+    'Run a full DNS diagnostic for a domain, testing the complete resolution path: Pi-hole cache, Unbound primary, Unbound secondary, and checking for DNSSEC issues. Use this FIRST when a user reports a domain is unreachable.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      domain: { type: 'string', description: 'Domain to diagnose' },
+      type: {
+        type: 'string',
+        description: 'DNS record type (A, AAAA, MX, TXT, CNAME, NS)',
+        default: 'A',
+      },
+    },
+    required: ['domain'],
+  },
+  handler: async (params) => {
+    const domain = params.domain as string;
+    const queryType = ((params.type as string) || 'A').toUpperCase();
+
+    // Validate query type
+    const validTypes = ['A', 'AAAA', 'MX', 'TXT', 'CNAME', 'NS', 'SOA', 'PTR'];
+    if (!validTypes.includes(queryType)) {
+      return {
+        error: true,
+        code: 'INVALID_TYPE',
+        message: `Invalid DNS record type. Valid types: ${validTypes.join(', ')}`,
+      };
+    }
+
+    // Validate domain format
+    if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(domain)) {
+      return {
+        error: true,
+        code: 'INVALID_DOMAIN',
+        message: 'Invalid domain format',
+      };
+    }
+
+    try {
+      // Find a ready Pi-hole pod to run dig commands from
+      const piholePod = await getReadyPod(PIHOLE_NAMESPACE, PIHOLE_LABEL);
+      if (!piholePod || !piholePod.metadata?.name) {
+        return notFoundError('Ready Pi-hole pod');
+      }
+      const podName = piholePod.metadata.name;
+
+      // Helper to run dig and parse results
+      const runDig = async (args: string[]) => {
+        const result = await execInPod(PIHOLE_NAMESPACE, podName, PIHOLE_CONTAINER, ['dig', ...args]);
+        const answers = result.stdout
+          .trim()
+          .split('\n')
+          .filter((line: string) => line.length > 0);
+        return {
+          answers,
+          resolved: answers.length > 0,
+          exitCode: result.exitCode,
+          stderr: result.stderr?.trim(),
+        };
+      };
+
+      // Step 1: Query Pi-hole (may return cached result)
+      const pihole = await runDig(['+short', '+time=5', '+tries=2', queryType, domain]);
+
+      // Step 2: Query Unbound primary directly (bypass Pi-hole cache)
+      const unboundPrimary = await runDig([
+        '+short',
+        '+time=5',
+        '+tries=2',
+        queryType,
+        domain,
+        '@unbound.pihole.svc.cluster.local',
+        '-p',
+        '5335',
+      ]);
+
+      // Step 3: Query Unbound secondary directly
+      const unboundSecondary = await runDig([
+        '+short',
+        '+time=5',
+        '+tries=2',
+        queryType,
+        domain,
+        '@unbound-secondary.pihole.svc.cluster.local',
+        '-p',
+        '5335',
+      ]);
+
+      // Step 4: If either Unbound failed, test with DNSSEC checking disabled (+cd)
+      let dnssecDiagnosis: Record<string, unknown> | null = null;
+      if (!unboundPrimary.resolved || !unboundSecondary.resolved) {
+        const primaryCd = !unboundPrimary.resolved
+          ? await runDig([
+              '+short',
+              '+cd',
+              '+time=5',
+              '+tries=2',
+              queryType,
+              domain,
+              '@unbound.pihole.svc.cluster.local',
+              '-p',
+              '5335',
+            ])
+          : null;
+        const secondaryCd = !unboundSecondary.resolved
+          ? await runDig([
+              '+short',
+              '+cd',
+              '+time=5',
+              '+tries=2',
+              queryType,
+              domain,
+              '@unbound-secondary.pihole.svc.cluster.local',
+              '-p',
+              '5335',
+            ])
+          : null;
+
+        const primaryDnssecIssue = primaryCd?.resolved === true;
+        const secondaryDnssecIssue = secondaryCd?.resolved === true;
+
+        dnssecDiagnosis = {
+          primaryDnssecFailure: primaryDnssecIssue,
+          secondaryDnssecFailure: secondaryDnssecIssue,
+          ...(primaryCd && { primaryWithCdDisabled: primaryCd }),
+          ...(secondaryCd && { secondaryWithCdDisabled: secondaryCd }),
+        };
+      }
+
+      // Step 5: Fetch Unbound logs filtered for the queried domain
+      let unboundLogs: Record<string, string[]> = {};
+      try {
+        const pods = await listPods(PIHOLE_NAMESPACE);
+        const unboundPodList = pods.filter((p) => p.metadata?.name?.includes('unbound'));
+
+        for (const pod of unboundPodList) {
+          const name = pod.metadata?.name;
+          if (!name) continue;
+          try {
+            const logText = await readPodLog(PIHOLE_NAMESPACE, name, { tailLines: 50 });
+            const logs = logText.split('\n');
+            const relevant = logs.filter((line: string) => line.toLowerCase().includes(domain.toLowerCase()));
+            if (relevant.length > 0) {
+              unboundLogs[name] = relevant;
+            }
+          } catch {
+            /* pod may not be ready */
+          }
+        }
+      } catch {
+        /* non-critical — log retrieval failure should not block diagnosis */
+      }
+
+      // Build diagnosis summary
+      const issues: string[] = [];
+      if (pihole.resolved && !unboundPrimary.resolved && !unboundSecondary.resolved) {
+        issues.push(
+          'Pi-hole returned cached result but BOTH Unbounds are failing — stale cache masking upstream failure'
+        );
+      }
+      if (!unboundPrimary.resolved) issues.push('Unbound primary SERVFAIL');
+      if (!unboundSecondary.resolved) issues.push('Unbound secondary SERVFAIL');
+      if (dnssecDiagnosis?.primaryDnssecFailure || dnssecDiagnosis?.secondaryDnssecFailure) {
+        issues.push(
+          'DNSSEC validation failure — domain resolves with checking disabled (+cd). Domain likely has broken DNSSEC. Fix: add domain-insecure exception to Unbound conf.d'
+        );
+      }
+      if (issues.length === 0 && pihole.resolved) {
+        issues.push('All resolution paths healthy');
+      }
+
+      return {
+        domain,
+        type: queryType,
+        pihole: { ...pihole, note: 'May be cached (serve-expired: yes, TTL up to 24h)' },
+        unboundPrimary,
+        unboundSecondary,
+        ...(dnssecDiagnosis && { dnssec: dnssecDiagnosis }),
+        ...(Object.keys(unboundLogs).length > 0 && { unboundLogs }),
+        diagnosis: issues,
+        executedOn: podName,
+      };
+    } catch (error) {
+      return k8sError(error);
+    }
+  },
+};
+
+export const dnsTools = [getDnsStatus, testDnsQuery, diagnoseDns, updatePiholeGravity, getPiholeWhitelist, getPiholeQueries];

@@ -2,6 +2,8 @@ export const ALLOWED_DEPLOYMENTS = new Set([
   'jellyfin/jellyfin',
   'pihole/pihole',
   'pihole/unbound',
+  'pihole/pihole-secondary',
+  'pihole/unbound-secondary',
   'immich/immich-server',
   'homepage/homepage',
   'uptime-kuma/uptime-kuma',

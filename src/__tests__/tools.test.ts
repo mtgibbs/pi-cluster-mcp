@@ -25,6 +25,8 @@ describe('tool registry', () => {
     expect(toolNames).toContain('update_pihole_gravity');
     expect(toolNames).toContain('get_pihole_whitelist');
     expect(toolNames).toContain('get_pihole_queries');
+    // DNS diagnostic tool
+    expect(toolNames).toContain('diagnose_dns');
     // Networking diagnostic tools
     expect(toolNames).toContain('get_node_networking');
     expect(toolNames).toContain('get_iptables_rules');
@@ -63,7 +65,7 @@ describe('tool registry', () => {
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(44);
+    expect(tools).toHaveLength(45);
   });
 
   it('has no duplicate tool names', () => {
@@ -86,6 +88,8 @@ describe('deployment whitelist', () => {
     expect(isDeploymentAllowed('jellyfin', 'jellyfin')).toBe(true);
     expect(isDeploymentAllowed('pihole', 'pihole')).toBe(true);
     expect(isDeploymentAllowed('pihole', 'unbound')).toBe(true);
+    expect(isDeploymentAllowed('pihole', 'pihole-secondary')).toBe(true);
+    expect(isDeploymentAllowed('pihole', 'unbound-secondary')).toBe(true);
     expect(isDeploymentAllowed('immich', 'immich-server')).toBe(true);
     expect(isDeploymentAllowed('homepage', 'homepage')).toBe(true);
     expect(isDeploymentAllowed('uptime-kuma', 'uptime-kuma')).toBe(true);
@@ -99,7 +103,7 @@ describe('deployment whitelist', () => {
 
   it('returns all allowed deployments', () => {
     const allowed = getAllowedDeployments();
-    expect(allowed).toHaveLength(18);
+    expect(allowed).toHaveLength(20);
     expect(allowed).toContain('jellyfin/jellyfin');
     expect(allowed).toContain('media/sonarr');
     expect(allowed).toContain('media/radarr');
