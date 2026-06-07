@@ -262,7 +262,8 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `reconcile_flux` | `resource?` | Trigger Flux sync (all or specific) |
 | `restart_deployment` | `namespace`, `deployment` | Rollout restart (whitelisted only) |
 | `fix_jellyfin_metadata` | `name` | Find item in DB, trigger API refresh |
-| `trigger_backup` | `job_name` | Create Job from CronJob |
+| `trigger_cronjob` | `namespace`, `cronjob` | Run any CronJob now (Job from its template) |
+| `trigger_backup` | `namespace`, `cronjob` | Alias of `trigger_cronjob` (back-compat) |
 | `test_dns_query` | `domain`, `type?` | Run dig against Pi-hole |
 | `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |

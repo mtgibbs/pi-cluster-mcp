@@ -71,9 +71,93 @@ const getBackupStatus: Tool = {
   },
 };
 
+function validateJobNames(namespace: string, cronjobName: string): string | null {
+  if (!DNS_1123_RE.test(namespace)) {
+    return 'Invalid namespace. Must match DNS-1123 format (lowercase alphanumeric and hyphens).';
+  }
+  if (!DNS_1123_RE.test(cronjobName)) {
+    return 'Invalid cronjob name. Must match DNS-1123 format (lowercase alphanumeric and hyphens).';
+  }
+  return null;
+}
+
+// Shared implementation behind trigger_cronjob (and its trigger_backup alias):
+// reads a CronJob and creates a one-off Job from its jobTemplate — the
+// equivalent of `kubectl create job --from=cronjob/<name>`. Returns the new
+// Job's name.
+async function createJobFromCronJob(
+  namespace: string,
+  cronjobName: string,
+  origin: string
+): Promise<string> {
+  const kc = getKubeConfig();
+  const batchApi = kc.makeApiClient(k8s.BatchV1Api);
+
+  const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
+  const jobTemplateSpec = cronjobResp.body.spec?.jobTemplate?.spec;
+  if (!jobTemplateSpec) {
+    throw new Error(`CronJob ${namespace}/${cronjobName} has no jobTemplate.spec`);
+  }
+
+  const jobName = `${cronjobName}-manual-${Date.now()}`;
+  const job: k8s.V1Job = {
+    apiVersion: 'batch/v1',
+    kind: 'Job',
+    metadata: {
+      name: jobName,
+      namespace,
+      labels: {
+        'job-origin': origin,
+        'cronjob-name': cronjobName,
+      },
+    },
+    spec: jobTemplateSpec,
+  };
+
+  await batchApi.createNamespacedJob(namespace, job);
+  return jobName;
+}
+
+const triggerCronjob: Tool = {
+  name: 'trigger_cronjob',
+  description:
+    'Manually run any CronJob now by creating a Job from its template (equivalent to `kubectl create job --from=cronjob/<name>`). Works for ANY CronJob — backups, renovate, etc. The Job runs immediately, independent of the schedule.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      namespace: { type: 'string', description: 'CronJob namespace' },
+      cronjob: { type: 'string', description: 'CronJob name to run now' },
+    },
+    required: ['namespace', 'cronjob'],
+  },
+  handler: async (params) => {
+    const namespace = params.namespace as string;
+    const cronjobName = params.cronjob as string;
+
+    const invalid = validateJobNames(namespace, cronjobName);
+    if (invalid) return validationError(invalid);
+
+    try {
+      const jobName = await createJobFromCronJob(namespace, cronjobName, 'manual-trigger');
+      return {
+        success: true,
+        message: `Created Job ${jobName} from CronJob ${namespace}/${cronjobName}`,
+        jobName,
+        namespace,
+        cronjob: cronjobName,
+      };
+    } catch (error) {
+      return k8sError(error);
+    }
+  },
+};
+
+// Backwards-compatible alias of trigger_cronjob (pre-dates the rename; kept so
+// existing callers and docs keep working). Prefer trigger_cronjob.
 const triggerBackup: Tool = {
   name: 'trigger_backup',
-  description: 'Manually trigger a backup by creating a Job from a CronJob',
+  description:
+    'Alias of trigger_cronjob: create a one-off Job from a CronJob. Kept for backwards compatibility — prefer trigger_cronjob.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -86,34 +170,14 @@ const triggerBackup: Tool = {
     const namespace = params.namespace as string;
     const cronjobName = params.cronjob as string;
 
+    const invalid = validateJobNames(namespace, cronjobName);
+    if (invalid) return validationError(invalid);
+
     try {
-      const kc = getKubeConfig();
-      const batchApi = kc.makeApiClient(k8s.BatchV1Api);
-
-      const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
-      const cronjob = cronjobResp.body;
-
-      const jobName = `${cronjobName}-manual-${Date.now()}`;
-
-      const job: k8s.V1Job = {
-        apiVersion: 'batch/v1',
-        kind: 'Job',
-        metadata: {
-          name: jobName,
-          namespace,
-          labels: {
-            'job-origin': 'manual-trigger',
-            'cronjob-name': cronjobName,
-          },
-        },
-        spec: cronjob.spec?.jobTemplate?.spec,
-      };
-
-      await batchApi.createNamespacedJob(namespace, job);
-
+      const jobName = await createJobFromCronJob(namespace, cronjobName, 'manual-trigger');
       return {
         success: true,
-        message: `Created backup job ${jobName} from CronJob ${cronjobName}`,
+        message: `Created job ${jobName} from CronJob ${cronjobName}`,
         jobName,
         namespace,
       };
@@ -265,4 +329,4 @@ const getJobLogs: Tool = {
   },
 };
 
-export const backupTools = [getBackupStatus, triggerBackup, getCronjobDetails, getJobLogs];
+export const backupTools = [getBackupStatus, triggerCronjob, triggerBackup, getCronjobDetails, getJobLogs];

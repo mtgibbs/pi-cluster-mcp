@@ -16,6 +16,7 @@ describe('tool registry', () => {
     expect(toolNames).toContain('get_secrets_status');
     expect(toolNames).toContain('refresh_secret');
     expect(toolNames).toContain('get_backup_status');
+    expect(toolNames).toContain('trigger_cronjob');
     expect(toolNames).toContain('trigger_backup');
     expect(toolNames).toContain('get_ingress_status');
     expect(toolNames).toContain('get_tailscale_status');
@@ -65,7 +66,7 @@ describe('tool registry', () => {
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(45);
+    expect(tools).toHaveLength(46);
   });
 
   it('has no duplicate tool names', () => {
