@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError, notTriggerableError } from '../utils/errors.js';
+import { validationError, k8sError, notTriggerableError, alreadyRunningError } from '../utils/errors.js';
 import { isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
 import * as k8s from '@kubernetes/client-node';
 
@@ -86,6 +86,10 @@ function validateJobNames(namespace: string, cronjobName: string): string | null
 // handlers and surfaced as a NOT_TRIGGERABLE error (distinct from k8s errors).
 class NotTriggerableError extends Error {}
 
+// Thrown when a run of the CronJob is already active (guard "A"); surfaced as
+// an ALREADY_RUNNING error so an overlapping manual run is refused.
+class AlreadyRunningError extends Error {}
+
 // Shared implementation behind trigger_cronjob (and its trigger_backup alias):
 // reads a CronJob and creates a one-off Job from its jobTemplate — the
 // equivalent of `kubectl create job --from=cronjob/<name>`. Returns the new
@@ -109,6 +113,27 @@ async function createJobFromCronJob(
       `CronJob ${namespace}/${cronjobName} is not opted in for manual triggering. ` +
         `Add label '${TRIGGERABLE_LABEL}: "true"' to its manifest — only for jobs that are ` +
         `idempotent and safe to run concurrently.`
+    );
+  }
+
+  // Guard A: refuse if a run of this CronJob is already active — a scheduled
+  // run (status.active) or a prior manual Job (labelled cronjob-name=<name>).
+  // Best-effort check-then-create; the label's idempotency contract covers the
+  // residual race where a scheduled run fires in the same instant.
+  const scheduledActive = cronjobResp.body.status?.active?.length ?? 0;
+  const existing = await batchApi.listNamespacedJob(
+    namespace,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    `cronjob-name=${cronjobName}`
+  );
+  const manualActive = existing.body.items.filter((j) => (j.status?.active ?? 0) > 0).length;
+  if (scheduledActive + manualActive > 0) {
+    throw new AlreadyRunningError(
+      `A run of ${namespace}/${cronjobName} is already active ` +
+        `(${scheduledActive} scheduled, ${manualActive} manual). Refusing to start an overlapping run.`
     );
   }
 
@@ -165,6 +190,7 @@ const triggerCronjob: Tool = {
         cronjob: cronjobName,
       };
     } catch (error) {
+      if (error instanceof AlreadyRunningError) return alreadyRunningError(error.message);
       if (error instanceof NotTriggerableError) return notTriggerableError(error.message);
       return k8sError(error);
     }
@@ -201,6 +227,7 @@ const triggerBackup: Tool = {
         namespace,
       };
     } catch (error) {
+      if (error instanceof AlreadyRunningError) return alreadyRunningError(error.message);
       if (error instanceof NotTriggerableError) return notTriggerableError(error.message);
       return k8sError(error);
     }

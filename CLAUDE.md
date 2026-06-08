@@ -163,6 +163,8 @@ metadata:
 
 There is **no central whitelist** — the opt-in lives in each CronJob's manifest, reviewed at PR time. Adding the label is an **attestation that the job is idempotent and safe to run concurrently**: a manual trigger creates an independent Job that bypasses the CronJob's `concurrencyPolicy`, so it can overlap a scheduled run. The tool can only instantiate an existing CronJob's `jobTemplate` (no arbitrary pods/commands); the label is the authorization layer on top of the `create` Jobs RBAC.
 
+As a second layer, the tool also **refuses to start an overlapping run**: if a Job for the CronJob is already active (a scheduled run via `status.active`, or a prior manual trigger labelled `cronjob-name=<name>`), it returns `ALREADY_RUNNING`. This is best-effort (check-then-create), so the label's idempotency attestation still covers the residual race.
+
 ### Exec Tools Security
 
 The exec-based tools (`test_dns_query`, `curl_ingress`, `test_pod_connectivity`, `get_node_networking`, `get_iptables_rules`, `get_conntrack_entries`) run commands inside cluster pods via the K8s exec API. Security is maintained through multiple layers:
