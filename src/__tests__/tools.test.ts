@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { tools } from '../tools/index.js';
-import { isDeploymentAllowed, getAllowedDeployments } from '../utils/whitelist.js';
+import { isDeploymentAllowed, getAllowedDeployments, isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
 import { parseIptablesSave, parseConntrack, parsePing } from '../utils/parsers.js';
 
 describe('tool registry', () => {
@@ -108,6 +108,20 @@ describe('deployment whitelist', () => {
     expect(allowed).toContain('jellyfin/jellyfin');
     expect(allowed).toContain('media/sonarr');
     expect(allowed).toContain('media/radarr');
+  });
+});
+
+describe('cronjob trigger opt-in', () => {
+  it('allows only cronjobs labelled triggerable="true"', () => {
+    expect(isCronjobTriggerable({ [TRIGGERABLE_LABEL]: 'true' })).toBe(true);
+  });
+
+  it('rejects missing, absent, or non-"true" labels', () => {
+    expect(isCronjobTriggerable(undefined)).toBe(false);
+    expect(isCronjobTriggerable({})).toBe(false);
+    expect(isCronjobTriggerable({ [TRIGGERABLE_LABEL]: 'false' })).toBe(false);
+    expect(isCronjobTriggerable({ [TRIGGERABLE_LABEL]: 'TRUE' })).toBe(false);
+    expect(isCronjobTriggerable({ 'other/label': 'true' })).toBe(false);
   });
 });
 

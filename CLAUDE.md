@@ -151,6 +151,18 @@ Only these deployments can be restarted via `restart_deployment`:
 - `media/jellyseerr`
 - `media/flaresolverr`
 
+### Manual CronJob Triggering (Opt-In Label)
+
+`trigger_cronjob` (and its `trigger_backup` alias) will only run a CronJob that carries the label:
+
+```yaml
+metadata:
+  labels:
+    homelab.mcp/triggerable: "true"
+```
+
+There is **no central whitelist** — the opt-in lives in each CronJob's manifest, reviewed at PR time. Adding the label is an **attestation that the job is idempotent and safe to run concurrently**: a manual trigger creates an independent Job that bypasses the CronJob's `concurrencyPolicy`, so it can overlap a scheduled run. The tool can only instantiate an existing CronJob's `jobTemplate` (no arbitrary pods/commands); the label is the authorization layer on top of the `create` Jobs RBAC.
+
 ### Exec Tools Security
 
 The exec-based tools (`test_dns_query`, `curl_ingress`, `test_pod_connectivity`, `get_node_networking`, `get_iptables_rules`, `get_conntrack_entries`) run commands inside cluster pods via the K8s exec API. Security is maintained through multiple layers:
@@ -262,8 +274,8 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `reconcile_flux` | `resource?` | Trigger Flux sync (all or specific) |
 | `restart_deployment` | `namespace`, `deployment` | Rollout restart (whitelisted only) |
 | `fix_jellyfin_metadata` | `name` | Find item in DB, trigger API refresh |
-| `trigger_cronjob` | `namespace`, `cronjob` | Run any CronJob now (Job from its template) |
-| `trigger_backup` | `namespace`, `cronjob` | Alias of `trigger_cronjob` (back-compat) |
+| `trigger_cronjob` | `namespace`, `cronjob` | Run a CronJob now (Job from its template). **Requires opt-in label** `homelab.mcp/triggerable: "true"` |
+| `trigger_backup` | `namespace`, `cronjob` | Alias of `trigger_cronjob` (back-compat); same opt-in label required |
 | `test_dns_query` | `domain`, `type?` | Run dig against Pi-hole |
 | `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |

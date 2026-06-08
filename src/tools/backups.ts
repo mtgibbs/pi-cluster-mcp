@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError } from '../utils/errors.js';
+import { validationError, k8sError, notTriggerableError } from '../utils/errors.js';
+import { isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
@@ -81,6 +82,10 @@ function validateJobNames(namespace: string, cronjobName: string): string | null
   return null;
 }
 
+// Thrown when a CronJob lacks the opt-in triggerable label; caught by the tool
+// handlers and surfaced as a NOT_TRIGGERABLE error (distinct from k8s errors).
+class NotTriggerableError extends Error {}
+
 // Shared implementation behind trigger_cronjob (and its trigger_backup alias):
 // reads a CronJob and creates a one-off Job from its jobTemplate — the
 // equivalent of `kubectl create job --from=cronjob/<name>`. Returns the new
@@ -94,6 +99,19 @@ async function createJobFromCronJob(
   const batchApi = kc.makeApiClient(k8s.BatchV1Api);
 
   const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
+
+  // Opt-in gate: only CronJobs labelled triggerable may be run manually. The
+  // label attests the job is idempotent and concurrency-safe (a manual run
+  // bypasses the CronJob's concurrencyPolicy, so an opted-in job must tolerate
+  // overlapping with a scheduled run).
+  if (!isCronjobTriggerable(cronjobResp.body.metadata?.labels)) {
+    throw new NotTriggerableError(
+      `CronJob ${namespace}/${cronjobName} is not opted in for manual triggering. ` +
+        `Add label '${TRIGGERABLE_LABEL}: "true"' to its manifest — only for jobs that are ` +
+        `idempotent and safe to run concurrently.`
+    );
+  }
+
   const jobTemplateSpec = cronjobResp.body.spec?.jobTemplate?.spec;
   if (!jobTemplateSpec) {
     throw new Error(`CronJob ${namespace}/${cronjobName} has no jobTemplate.spec`);
@@ -147,6 +165,7 @@ const triggerCronjob: Tool = {
         cronjob: cronjobName,
       };
     } catch (error) {
+      if (error instanceof NotTriggerableError) return notTriggerableError(error.message);
       return k8sError(error);
     }
   },
@@ -182,6 +201,7 @@ const triggerBackup: Tool = {
         namespace,
       };
     } catch (error) {
+      if (error instanceof NotTriggerableError) return notTriggerableError(error.message);
       return k8sError(error);
     }
   },
