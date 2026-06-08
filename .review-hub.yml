@@ -1,0 +1,5 @@
+# review-hub opt-in — which eval gates the bot runs on this repo's PRs.
+# Presence of this file is the sign-up; absence means no review.
+# https://github.com/mtgibbs/pi-cluster -> specs/review-hub/
+validators:
+  - gate-regression   # flags PRs that weaken a security gate (triggerable label / Guard A / deploy allowlist)
