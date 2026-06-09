@@ -10,3 +10,4 @@ validators:
   - fail-closed          # error paths that stop refusing (fail-open)
   - read-only-integrity  # an existing read-only tool gaining a write
   - no-false-green       # a status/reader tool reporting healthy/ok/empty when the check actually failed
+  - output-bounds        # a tool returning unbounded list/log/stdout output (no limit/cap) that blows the caller's context
