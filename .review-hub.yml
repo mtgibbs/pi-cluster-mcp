@@ -2,4 +2,10 @@
 # Presence of this file is the sign-up; absence means no review.
 # https://github.com/mtgibbs/pi-cluster -> specs/review-hub/
 validators:
-  - gate-regression   # flags PRs that weaken a security gate (triggerable label / Guard A / deploy allowlist)
+  - gate-regression      # weakening a security gate (triggerable label / Guard A / deploy allowlist)
+  - secret-hygiene       # output secret-leakage (env/secretRef redaction, kubeconfig)
+  - input-validation     # unvalidated user input reaching a sink (k8s / exec / shell / URL)
+  - mutation-gating      # a new mutating tool shipping with no gate
+  - concurrency-safety   # active-run guard integrity (weaken / remove / unwire / raise threshold)
+  - fail-closed          # error paths that stop refusing (fail-open)
+  - read-only-integrity  # an existing read-only tool gaining a write
