@@ -9,3 +9,4 @@ validators:
   - concurrency-safety   # active-run guard integrity (weaken / remove / unwire / raise threshold)
   - fail-closed          # error paths that stop refusing (fail-open)
   - read-only-integrity  # an existing read-only tool gaining a write
+  - no-false-green       # a status/reader tool reporting healthy/ok/empty when the check actually failed
