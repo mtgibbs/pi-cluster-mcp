@@ -202,6 +202,36 @@ export function validateParser(raw: unknown): mealie.IngredientParser | ToolErro
   return raw as mealie.IngredientParser;
 }
 
+// Get-or-create a food/unit by name. Search-first makes the operation
+// idempotent across sequential runs (the same name always resolves to the
+// same record instead of creating duplicates); the shared in-flight promise
+// per name is the active-run guard for CONCURRENT resolution — overlapping
+// parses that hit the same new name await one create instead of racing.
+const inflightResolves = new Map<string, Promise<string>>();
+
+async function resolveIdByName(kind: 'food' | 'unit', name: string): Promise<string> {
+  const key = `${kind}:${name.toLowerCase()}`;
+  const inflight = inflightResolves.get(key);
+  if (inflight) {
+    return inflight;
+  }
+  const resolution = (async () => {
+    const found = kind === 'food' ? await mealie.searchFoods(name) : await mealie.searchUnits(name);
+    const match = found.items.find((i) => i.name.toLowerCase() === name.toLowerCase());
+    if (match) {
+      return match.id;
+    }
+    const created = kind === 'food' ? await mealie.createFood(name) : await mealie.createUnit(name);
+    return created.id;
+  })();
+  inflightResolves.set(key, resolution);
+  try {
+    return await resolution;
+  } finally {
+    inflightResolves.delete(key);
+  }
+}
+
 interface ParseOutcome {
   parsed: boolean;
   parser?: mealie.IngredientParser;
@@ -230,6 +260,13 @@ export function isRecipeParseEligible(settings: Record<string, unknown> | undefi
 // Parse a recipe's ingredient lines into structured quantity/unit/food and
 // write them back. Also flips settings.disableAmount off — imports set it
 // true, which is why imported ingredients render as plain text.
+//
+// NOTE: this is NOT a read-only helper — it is the shared WRITE-BACK stage of
+// the two mutating tools (import_mealie_recipe_url and
+// parse_mealie_recipe_ingredients), and has always ended in a recipe PUT.
+// Creating missing foods/units via resolveIdByName is part of that same
+// gated write (the recipe update API requires DB ids), not a new write on a
+// read path.
 //
 // Write scope: the PUT only replaces `recipeIngredient` — derived exclusively
 // from the recipe's OWN existing ingredient lines — and `settings.disableAmount`.
@@ -268,6 +305,19 @@ async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientP
     );
     if (parsedResults.length !== lines.length) {
       return { parsed: false, parser, error: `parser returned ${parsedResults.length} results for ${lines.length} lines` };
+    }
+
+    // The recipe UPDATE path requires DB ids for food/unit references — the
+    // parser only attaches ids for foods/units it matched to existing
+    // records. Get-or-create the rest before the PUT.
+    for (const p of parsedResults) {
+      const ing = p.ingredient;
+      if (ing.food?.name && !ing.food.id) {
+        ing.food = { id: await resolveIdByName('food', ing.food.name), name: ing.food.name };
+      }
+      if (ing.unit?.name && !ing.unit.id) {
+        ing.unit = { id: await resolveIdByName('unit', ing.unit.name), name: ing.unit.name };
+      }
     }
 
     recipe.recipeIngredient = parsedResults.map((p, idx) => ({

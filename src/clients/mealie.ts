@@ -151,6 +151,32 @@ export async function parseIngredients(parser: IngredientParser, ingredients: st
   });
 }
 
+// Foods and units. The recipe UPDATE path requires DB ids for food/unit
+// references (create-by-name is only honored on recipe CREATE), so parsed
+// ingredients with unmatched foods/units need get-or-create through these
+// endpoints before the recipe PUT.
+
+export interface FoodOrUnit {
+  id: string;
+  name: string;
+}
+
+export async function createFood(name: string): Promise<FoodOrUnit> {
+  return mealieFetch<FoodOrUnit>('/foods', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export async function searchFoods(search: string): Promise<{ items: FoodOrUnit[] }> {
+  return mealieFetch<{ items: FoodOrUnit[] }>(`/foods?search=${encodeURIComponent(search)}&perPage=50`);
+}
+
+export async function createUnit(name: string): Promise<FoodOrUnit> {
+  return mealieFetch<FoodOrUnit>('/units', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export async function searchUnits(search: string): Promise<{ items: FoodOrUnit[] }> {
+  return mealieFetch<{ items: FoodOrUnit[] }>(`/units?search=${encodeURIComponent(search)}&perPage=50`);
+}
+
 // Raw recipe JSON round-trip for structured updates. The full Recipe payload
 // is much larger than our trimmed Recipe interface, so treat it as opaque.
 export async function getRecipeRaw(slug: string): Promise<Record<string, unknown>> {
