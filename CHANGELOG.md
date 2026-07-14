@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.24](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.23...homelab-mcp-v0.1.24) (2026-07-14)
+
+
+### Bug Fixes
+
+* get-or-create foods/units before parsed-ingredient write-back ([#42](https://github.com/mtgibbs/pi-cluster-mcp/issues/42)) ([6416cf3](https://github.com/mtgibbs/pi-cluster-mcp/commit/6416cf33cc8f75c4135a1dde6442aa1134b72587))
+
 ## [0.1.23](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.22...homelab-mcp-v0.1.23) (2026-07-14)
 
 
