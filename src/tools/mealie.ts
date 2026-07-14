@@ -36,6 +36,22 @@ export function validateImportUrl(raw: unknown): URL | ToolError {
   return url;
 }
 
+// Active-run guard: one in-flight import per normalized URL, so overlapping
+// calls can't race Mealie into duplicate recipes.
+const activeImports = new Set<string>();
+
+export function beginImport(key: string): boolean {
+  if (activeImports.has(key)) {
+    return false;
+  }
+  activeImports.add(key);
+  return true;
+}
+
+export function endImport(key: string): void {
+  activeImports.delete(key);
+}
+
 export function validateSlug(raw: unknown): string | ToolError {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > 256) {
     return validationError('slug must be a non-empty string (max 256 chars)');
@@ -197,8 +213,16 @@ const importMealieRecipeUrl: Tool = {
     }
     const includeTags = params.includeTags !== false;
 
+    const importKey = url.toString();
+    if (!beginImport(importKey)) {
+      return {
+        error: true,
+        code: 'IMPORT_IN_PROGRESS',
+        message: `An import for ${importKey} is already running — wait for it to finish instead of retrying.`,
+      };
+    }
     try {
-      const slug = await mealie.importRecipeFromUrl(url.toString(), includeTags);
+      const slug = await mealie.importRecipeFromUrl(importKey, includeTags);
       return {
         imported: true,
         slug,
@@ -207,6 +231,8 @@ const importMealieRecipeUrl: Tool = {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Mealie error';
       return { error: true, code: 'MEALIE_ERROR', message };
+    } finally {
+      endImport(importKey);
     }
   },
 };

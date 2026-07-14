@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateImportUrl, validateSlug } from '../tools/mealie.js';
+import { validateImportUrl, validateSlug, beginImport, endImport } from '../tools/mealie.js';
 
 function isError(v: unknown): boolean {
   return typeof v === 'object' && v !== null && (v as { error?: boolean }).error === true;
@@ -40,6 +40,24 @@ describe('mealie import URL gate', () => {
 
   it('does not block public 172.x addresses outside 172.16/12', () => {
     expect(validateImportUrl('http://172.32.0.1/')).toBeInstanceOf(URL);
+  });
+});
+
+describe('mealie import active-run guard', () => {
+  it('blocks a second import of the same URL while one is in flight', () => {
+    const key = 'https://example.com/soup';
+    expect(beginImport(key)).toBe(true);
+    expect(beginImport(key)).toBe(false); // overlap refused
+    endImport(key);
+    expect(beginImport(key)).toBe(true); // released after completion
+    endImport(key);
+  });
+
+  it('allows different URLs to import concurrently', () => {
+    expect(beginImport('https://example.com/a')).toBe(true);
+    expect(beginImport('https://example.com/b')).toBe(true);
+    endImport('https://example.com/a');
+    endImport('https://example.com/b');
   });
 });
 
