@@ -202,6 +202,35 @@ export function validateParser(raw: unknown): mealie.IngredientParser | ToolErro
   return raw as mealie.IngredientParser;
 }
 
+// Get-or-create a food/unit by name, caching per parse run. Create first
+// (the common case for a fresh library); if the API refuses (e.g. duplicate
+// name constraint), fall back to an exact-match search.
+async function resolveIdByName(
+  kind: 'food' | 'unit',
+  name: string,
+  cache: Map<string, string>
+): Promise<string> {
+  const key = name.toLowerCase();
+  const cached = cache.get(key);
+  if (cached) {
+    return cached;
+  }
+  try {
+    const created = kind === 'food' ? await mealie.createFood(name) : await mealie.createUnit(name);
+    cache.set(key, created.id);
+    return created.id;
+  } catch (createError) {
+    const found = kind === 'food' ? await mealie.searchFoods(name) : await mealie.searchUnits(name);
+    const match = found.items.find((i) => i.name.toLowerCase() === key);
+    if (!match) {
+      const message = createError instanceof Error ? createError.message : 'create failed';
+      throw new Error(`could not create or find ${kind} '${name}': ${message}`);
+    }
+    cache.set(key, match.id);
+    return match.id;
+  }
+}
+
 interface ParseOutcome {
   parsed: boolean;
   parser?: mealie.IngredientParser;
@@ -268,6 +297,21 @@ async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientP
     );
     if (parsedResults.length !== lines.length) {
       return { parsed: false, parser, error: `parser returned ${parsedResults.length} results for ${lines.length} lines` };
+    }
+
+    // The recipe UPDATE path requires DB ids for food/unit references — the
+    // parser only attaches ids for foods/units it matched to existing
+    // records. Get-or-create the rest before the PUT.
+    const foodCache = new Map<string, string>();
+    const unitCache = new Map<string, string>();
+    for (const p of parsedResults) {
+      const ing = p.ingredient;
+      if (ing.food?.name && !ing.food.id) {
+        ing.food = { id: await resolveIdByName('food', ing.food.name, foodCache), name: ing.food.name };
+      }
+      if (ing.unit?.name && !ing.unit.id) {
+        ing.unit = { id: await resolveIdByName('unit', ing.unit.name, unitCache), name: ing.unit.name };
+      }
     }
 
     recipe.recipeIngredient = parsedResults.map((p, idx) => ({
