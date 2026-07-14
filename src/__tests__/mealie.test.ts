@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { validateImportUrl, validateSlug, validateParser, beginImport, endImport } from '../tools/mealie.js';
+import {
+  validateImportUrl,
+  validateSlug,
+  validateParser,
+  beginImport,
+  endImport,
+  parseGuardKey,
+} from '../tools/mealie.js';
 
 function isError(v: unknown): boolean {
   return typeof v === 'object' && v !== null && (v as { error?: boolean }).error === true;
@@ -58,6 +65,22 @@ describe('mealie import active-run guard', () => {
     expect(beginImport('https://example.com/b')).toBe(true);
     endImport('https://example.com/a');
     endImport('https://example.com/b');
+  });
+
+  it('parse operations on the same slug share one guard key regardless of caller', () => {
+    // Both the standalone parse tool and the import-embedded parse acquire
+    // parseGuardKey(slug), so they can never race the same recipe.
+    const key = parseGuardKey('gyudon');
+    expect(beginImport(key)).toBe(true);
+    expect(beginImport(parseGuardKey('gyudon'))).toBe(false); // blocked
+    expect(beginImport(parseGuardKey('other-recipe'))).toBe(true); // independent
+    endImport(key);
+    endImport(parseGuardKey('other-recipe'));
+  });
+
+  it('parse guard keys never collide with import URL keys', () => {
+    expect(parseGuardKey('gyudon')).not.toBe('gyudon');
+    expect(parseGuardKey('gyudon').startsWith('parse:')).toBe(true);
   });
 });
 

@@ -210,12 +210,42 @@ interface ParseOutcome {
   error?: string;
 }
 
+// Single guard key for ALL ingredient-parse writes on a slug — used by both
+// the standalone parse tool and the parse embedded in URL import, so the two
+// paths can never race the same recipe's read-modify-write.
+export function parseGuardKey(slug: string): string {
+  return `parse:${slug}`;
+}
+
 // Parse a recipe's ingredient lines into structured quantity/unit/food and
 // write them back. Also flips settings.disableAmount off — imports set it
 // true, which is why imported ingredients render as plain text.
-async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientParser): Promise<ParseOutcome> {
+//
+// Write scope (mutation gate): the PUT only replaces `recipeIngredient` —
+// derived exclusively from the recipe's OWN existing ingredient lines — and
+// `settings.disableAmount`. No caller-supplied content reaches the write;
+// `parser` merely selects Mealie's parsing backend. Recipes that already
+// have structured ingredients are refused unless `force` is set, so a
+// hand-curated recipe can't be silently clobbered.
+async function parseAndApplyIngredients(
+  slug: string,
+  parser: mealie.IngredientParser,
+  force: boolean
+): Promise<ParseOutcome> {
+  const guardKey = parseGuardKey(slug);
+  if (!beginImport(guardKey)) {
+    return { parsed: false, parser, error: `a parse for '${slug}' is already running — wait for it to finish` };
+  }
   try {
     const recipe = await mealie.getRecipeRaw(slug);
+    const settings = (recipe.settings as Record<string, unknown> | undefined) ?? {};
+    if (settings.disableAmount === false && !force) {
+      return {
+        parsed: false,
+        parser,
+        error: `'${slug}' already has structured ingredients — pass force: true to re-parse and overwrite them`,
+      };
+    }
     const existing = (recipe.recipeIngredient as Record<string, unknown>[] | undefined) ?? [];
     if (existing.length === 0) {
       return { parsed: false, parser, error: 'recipe has no ingredient lines to parse' };
@@ -239,7 +269,6 @@ async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientP
       ...p.ingredient,
       originalText: lines[idx],
     }));
-    const settings = (recipe.settings as Record<string, unknown> | undefined) ?? {};
     settings.disableAmount = false;
     recipe.settings = settings;
 
@@ -261,6 +290,8 @@ async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientP
     // The recipe itself is intact either way — report the parse failure
     // rather than failing the caller's import.
     return { parsed: false, parser, error: error instanceof Error ? error.message : 'Unknown Mealie error' };
+  } finally {
+    endImport(guardKey);
   }
 }
 
@@ -313,7 +344,10 @@ const importMealieRecipeUrl: Tool = {
     }
     try {
       const slug = await mealie.importRecipeFromUrl(importKey, includeTags);
-      const parse = shouldParse ? await parseAndApplyIngredients(slug, parser) : undefined;
+      // Embedded parse writes ONLY to the slug this import just created —
+      // never a pre-existing recipe (fresh imports always have
+      // disableAmount=true, so the no-force overwrite gate stays intact).
+      const parse = shouldParse ? await parseAndApplyIngredients(slug, parser, false) : undefined;
       return {
         imported: true,
         slug,
@@ -343,6 +377,12 @@ const parseMealieRecipeIngredients: Tool = {
         description: 'Ingredient parser: nlp (built-in, fast, default), brute, or openai (group AI provider)',
         default: 'nlp',
       },
+      force: {
+        type: 'boolean',
+        description:
+          'Required to re-parse a recipe that already has structured ingredients (overwrites them; original text lines are preserved in originalText). Default: false',
+        default: false,
+      },
     },
     required: ['slug'],
   },
@@ -356,20 +396,8 @@ const parseMealieRecipeIngredients: Tool = {
       return parser;
     }
 
-    const parseKey = `parse:${slug}`;
-    if (!beginImport(parseKey)) {
-      return {
-        error: true,
-        code: 'PARSE_IN_PROGRESS',
-        message: `A parse for '${slug}' is already running — wait for it to finish instead of retrying.`,
-      };
-    }
-    try {
-      const outcome = await parseAndApplyIngredients(slug, parser);
-      return { slug, url: mealie.recipeUrl(slug), ...outcome };
-    } finally {
-      endImport(parseKey);
-    }
+    const outcome = await parseAndApplyIngredients(slug, parser, params.force === true);
+    return { slug, url: mealie.recipeUrl(slug), ...outcome };
   },
 };
 
