@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.23](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.22...homelab-mcp-v0.1.23) (2026-07-14)
+
+
+### Features
+
+* structured ingredient parsing for Mealie imports ([#40](https://github.com/mtgibbs/pi-cluster-mcp/issues/40)) ([2bda957](https://github.com/mtgibbs/pi-cluster-mcp/commit/2bda957f95ea31acdd6ce2da7c31ffcbff4caf91))
+
 ## [0.1.22](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.21...homelab-mcp-v0.1.22) (2026-07-14)
 
 
