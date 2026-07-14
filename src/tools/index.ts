@@ -16,6 +16,7 @@ import { sonarrTools } from './sonarr.js';
 import { radarrTools } from './radarr.js';
 import { sabnzbdTools } from './sabnzbd.js';
 import { arrSharedTools } from './arr-shared.js';
+import { mealieTools } from './mealie.js';
 
 export interface Tool {
   name: string;
@@ -47,6 +48,7 @@ export const tools: Tool[] = [
   ...radarrTools,
   ...sabnzbdTools,
   ...arrSharedTools,
+  ...mealieTools,
 ];
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));

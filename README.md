@@ -74,6 +74,10 @@ This project is built with a "defense in depth" approach:
 | `RADARR_API_KEY` | API Key for Radarr operations | Yes (for Movie tools) |
 | `SABNZBD_URL` | Internal URL for SABnzbd | No (default: cluster svc) |
 | `SABNZBD_API_KEY` | API Key for SABnzbd operations | Yes (for Download tools) |
+| `MEALIE_URL` | Internal URL for Mealie | No (default: cluster svc) |
+| `MEALIE_API_TOKEN` | API token for Mealie operations | Yes (for Recipe tools) |
+| `MEALIE_PUBLIC_URL` | Public base URL for recipe links | No (default: recipes.lab.mtgibbs.dev) |
+| `MEALIE_GROUP_SLUG` | Group slug used in recipe web links | No (default: home) |
 
 ## 📦 Deployment
 
@@ -119,6 +123,7 @@ The server is designed to be deployed as a Pod in your cluster.
 | **Movies (Radarr)** | `get_radarr_queue`, `get_radarr_history`, `search_radarr_movie` |
 | **Downloads (SABnzbd)** | `get_sabnzbd_queue`, `get_sabnzbd_history`, `retry_sabnzbd_download`, `pause_resume_sabnzbd` |
 | **Arr Shared** | `get_quality_profile`, `reject_and_search` |
+| **Recipes (Mealie)** | `get_mealie_status`, `search_mealie_recipes`, `get_mealie_recipe`, `import_mealie_recipe_url` |
 | **Backups** | `get_backup_status`, `trigger_backup`, `get_cronjob_details`, `get_job_logs` |
 | **Secrets** | `get_secrets_status`, `refresh_secret` |
 | **Storage** | `get_pvcs` |
