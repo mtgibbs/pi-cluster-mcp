@@ -1,5 +1,50 @@
 import type { Tool } from './index.js';
 import * as mealie from '../clients/mealie.js';
+import { validationError, type ToolError } from '../utils/errors.js';
+
+const PRIVATE_IPV4 =
+  /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.)/;
+
+// Gate for the import sink: Mealie's server fetches the URL we hand it, so
+// refuse anything that could point it at cluster-internal or LAN targets.
+export function validateImportUrl(raw: unknown): URL | ToolError {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 2048) {
+    return validationError('url must be a non-empty string (max 2048 chars)');
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return validationError(`url is not a valid URL: ${raw}`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return validationError(`url must be http(s), got ${url.protocol}`);
+  }
+  const host = url.hostname.toLowerCase();
+  if (
+    host === 'localhost' ||
+    host.startsWith('[') || // IPv6 literal
+    host.includes(':') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.cluster.local') ||
+    host.endsWith('.lab.mtgibbs.dev') ||
+    PRIVATE_IPV4.test(host)
+  ) {
+    return validationError(`url host '${host}' is internal/private — recipe imports must target public sites`);
+  }
+  return url;
+}
+
+export function validateSlug(raw: unknown): string | ToolError {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 256) {
+    return validationError('slug must be a non-empty string (max 256 chars)');
+  }
+  if (!/^[a-z0-9][a-z0-9-]*$/i.test(raw)) {
+    return validationError(`slug '${raw}' is not a valid Mealie slug`);
+  }
+  return raw;
+}
 
 interface RecipeSummaryOut {
   slug: string;
@@ -103,7 +148,10 @@ const getMealieRecipe: Tool = {
     required: ['slug'],
   },
   handler: async (params) => {
-    const slug = params.slug as string;
+    const slug = validateSlug(params.slug);
+    if (typeof slug !== 'string') {
+      return slug;
+    }
 
     try {
       const recipe = await mealie.getRecipe(slug);
@@ -143,11 +191,14 @@ const importMealieRecipeUrl: Tool = {
     required: ['url'],
   },
   handler: async (params) => {
-    const url = params.url as string;
+    const url = validateImportUrl(params.url);
+    if (!(url instanceof URL)) {
+      return url;
+    }
     const includeTags = params.includeTags !== false;
 
     try {
-      const slug = await mealie.importRecipeFromUrl(url, includeTags);
+      const slug = await mealie.importRecipeFromUrl(url.toString(), includeTags);
       return {
         imported: true,
         slug,

@@ -62,10 +62,15 @@ describe('tool registry', () => {
     // Arr shared tools
     expect(toolNames).toContain('get_quality_profile');
     expect(toolNames).toContain('reject_and_search');
+    // Mealie tools
+    expect(toolNames).toContain('get_mealie_status');
+    expect(toolNames).toContain('search_mealie_recipes');
+    expect(toolNames).toContain('get_mealie_recipe');
+    expect(toolNames).toContain('import_mealie_recipe_url');
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(45);
+    expect(tools).toHaveLength(49);
   });
 
   it('has no duplicate tool names', () => {
