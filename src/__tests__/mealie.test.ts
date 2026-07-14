@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { validateImportUrl, validateSlug, beginImport, endImport } from '../tools/mealie.js';
+import {
+  validateImportUrl,
+  validateSlug,
+  validateParser,
+  beginImport,
+  endImport,
+  parseGuardKey,
+  isRecipeParseEligible,
+} from '../tools/mealie.js';
 
 function isError(v: unknown): boolean {
   return typeof v === 'object' && v !== null && (v as { error?: boolean }).error === true;
@@ -58,6 +66,53 @@ describe('mealie import active-run guard', () => {
     expect(beginImport('https://example.com/b')).toBe(true);
     endImport('https://example.com/a');
     endImport('https://example.com/b');
+  });
+
+  it('parse operations on the same slug share one guard key regardless of caller', () => {
+    // Both the standalone parse tool and the import-embedded parse acquire
+    // parseGuardKey(slug), so they can never race the same recipe.
+    const key = parseGuardKey('gyudon');
+    expect(beginImport(key)).toBe(true);
+    expect(beginImport(parseGuardKey('gyudon'))).toBe(false); // blocked
+    expect(beginImport(parseGuardKey('other-recipe'))).toBe(true); // independent
+    endImport(key);
+    endImport(parseGuardKey('other-recipe'));
+  });
+
+  it('parse guard keys never collide with import URL keys', () => {
+    expect(parseGuardKey('gyudon')).not.toBe('gyudon');
+    expect(parseGuardKey('gyudon').startsWith('parse:')).toBe(true);
+  });
+});
+
+describe('mealie parse scope gate', () => {
+  it('admits unstructured (machine-imported) recipes', () => {
+    expect(isRecipeParseEligible({ disableAmount: true })).toBe(true);
+    expect(isRecipeParseEligible({})).toBe(true);
+    expect(isRecipeParseEligible(undefined)).toBe(true);
+  });
+
+  it('refuses recipes that already have structured ingredients — no override', () => {
+    expect(isRecipeParseEligible({ disableAmount: false })).toBe(false);
+  });
+});
+
+describe('mealie parser validation', () => {
+  it('defaults to nlp when omitted', () => {
+    expect(validateParser(undefined)).toBe('nlp');
+    expect(validateParser(null)).toBe('nlp');
+  });
+
+  it('accepts known parsers', () => {
+    expect(validateParser('nlp')).toBe('nlp');
+    expect(validateParser('brute')).toBe('brute');
+    expect(validateParser('openai')).toBe('openai');
+  });
+
+  it('rejects unknown parsers', () => {
+    expect(isError(validateParser('gpt4'))).toBe(true);
+    expect(isError(validateParser(42))).toBe(true);
+    expect(isError(validateParser(''))).toBe(true);
   });
 });
 

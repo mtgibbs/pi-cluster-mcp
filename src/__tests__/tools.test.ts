@@ -67,10 +67,11 @@ describe('tool registry', () => {
     expect(toolNames).toContain('search_mealie_recipes');
     expect(toolNames).toContain('get_mealie_recipe');
     expect(toolNames).toContain('import_mealie_recipe_url');
+    expect(toolNames).toContain('parse_mealie_recipe_ingredients');
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(49);
+    expect(tools).toHaveLength(50);
   });
 
   it('has no duplicate tool names', () => {

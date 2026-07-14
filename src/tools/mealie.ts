@@ -190,10 +190,120 @@ const getMealieRecipe: Tool = {
   },
 };
 
+const PARSERS = ['nlp', 'brute', 'openai'] as const;
+
+export function validateParser(raw: unknown): mealie.IngredientParser | ToolError {
+  if (raw === undefined || raw === null) {
+    return 'nlp';
+  }
+  if (typeof raw !== 'string' || !PARSERS.includes(raw as mealie.IngredientParser)) {
+    return validationError(`parser must be one of ${PARSERS.join(', ')}`);
+  }
+  return raw as mealie.IngredientParser;
+}
+
+interface ParseOutcome {
+  parsed: boolean;
+  parser?: mealie.IngredientParser;
+  ingredients?: { input: string; quantity?: number | null; unit?: string; food?: string; note?: string }[];
+  matchedFoods?: number;
+  error?: string;
+}
+
+// Single guard key for ALL ingredient-parse writes on a slug — used by both
+// the standalone parse tool and the parse embedded in URL import, so the two
+// paths can never race the same recipe's read-modify-write.
+export function parseGuardKey(slug: string): string {
+  return `parse:${slug}`;
+}
+
+// Scope gate for the parse mutation (same role as isDeploymentAllowed for
+// restart_deployment): parsing may ONLY target recipes that are still
+// unstructured — settings.disableAmount !== false, i.e. machine-imported and
+// never parsed. Recipes with structured (possibly hand-curated) ingredients
+// are refused unconditionally; there is no caller override. This closes the
+// tool's reachable set to unstructured→structured transitions only.
+export function isRecipeParseEligible(settings: Record<string, unknown> | undefined): boolean {
+  return (settings?.disableAmount ?? true) !== false;
+}
+
+// Parse a recipe's ingredient lines into structured quantity/unit/food and
+// write them back. Also flips settings.disableAmount off — imports set it
+// true, which is why imported ingredients render as plain text.
+//
+// Write scope: the PUT only replaces `recipeIngredient` — derived exclusively
+// from the recipe's OWN existing ingredient lines — and `settings.disableAmount`.
+// No caller-supplied content reaches the write; `parser` merely selects
+// Mealie's parsing backend. The isRecipeParseEligible gate runs BEFORE any
+// mutation: structured recipes are refused with no override.
+async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientParser): Promise<ParseOutcome> {
+  const guardKey = parseGuardKey(slug);
+  if (!beginImport(guardKey)) {
+    return { parsed: false, parser, error: `a parse for '${slug}' is already running — wait for it to finish` };
+  }
+  try {
+    const recipe = await mealie.getRecipeRaw(slug);
+    const settings = (recipe.settings as Record<string, unknown> | undefined) ?? {};
+    if (!isRecipeParseEligible(settings)) {
+      return {
+        parsed: false,
+        parser,
+        error: `'${slug}' already has structured ingredients — parsing is not allowed on structured recipes (edit them in the Mealie UI instead)`,
+      };
+    }
+    const existing = (recipe.recipeIngredient as Record<string, unknown>[] | undefined) ?? [];
+    if (existing.length === 0) {
+      return { parsed: false, parser, error: 'recipe has no ingredient lines to parse' };
+    }
+    if (existing.length > 100) {
+      return { parsed: false, parser, error: `refusing to parse ${existing.length} ingredient lines (max 100)` };
+    }
+
+    const lines = existing.map((i) =>
+      String(i.originalText || i.display || i.note || '').trim()
+    );
+    const parsedResults = await mealie.parseIngredients(
+      parser,
+      lines.map((line) => line.replace(/^[-*•]\s*/, ''))
+    );
+    if (parsedResults.length !== lines.length) {
+      return { parsed: false, parser, error: `parser returned ${parsedResults.length} results for ${lines.length} lines` };
+    }
+
+    recipe.recipeIngredient = parsedResults.map((p, idx) => ({
+      ...p.ingredient,
+      originalText: lines[idx],
+    }));
+    settings.disableAmount = false;
+    recipe.settings = settings;
+
+    await mealie.updateRecipeRaw(slug, recipe);
+
+    return {
+      parsed: true,
+      parser,
+      matchedFoods: parsedResults.filter((p) => p.ingredient.food?.id).length,
+      ingredients: parsedResults.map((p, idx) => ({
+        input: lines[idx],
+        quantity: p.ingredient.quantity,
+        unit: p.ingredient.unit?.name,
+        food: p.ingredient.food?.name,
+        note: p.ingredient.note || undefined,
+      })),
+    };
+  } catch (error) {
+    // The recipe itself is intact either way — report the parse failure
+    // rather than failing the caller's import.
+    return { parsed: false, parser, error: error instanceof Error ? error.message : 'Unknown Mealie error' };
+  } finally {
+    endImport(guardKey);
+  }
+}
+
 const importMealieRecipeUrl: Tool = {
   name: 'import_mealie_recipe_url',
   description:
-    'Import a recipe into Mealie from a URL (the recipe-scrapers/schema.org path — no AI required). Returns the created recipe slug. Fails cleanly on sites without structured recipe data.',
+    'Import a recipe into Mealie from a URL (the recipe-scrapers/schema.org path — no AI required). By default the imported ingredient lines are then parsed into structured quantity/unit/food (enables scaling + shopping lists). Returns the created recipe slug plus the parse outcome. Fails cleanly on sites without structured recipe data.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -203,6 +313,17 @@ const importMealieRecipeUrl: Tool = {
         description: 'Import the site’s keywords as Mealie tags (default: true)',
         default: true,
       },
+      parseIngredients: {
+        type: 'boolean',
+        description: 'Parse ingredient lines into structured quantity/unit/food after import (default: true)',
+        default: true,
+      },
+      parser: {
+        type: 'string',
+        enum: ['nlp', 'brute', 'openai'],
+        description: 'Ingredient parser: nlp (built-in, fast, default), brute, or openai (group AI provider)',
+        default: 'nlp',
+      },
     },
     required: ['url'],
   },
@@ -211,7 +332,12 @@ const importMealieRecipeUrl: Tool = {
     if (!(url instanceof URL)) {
       return url;
     }
+    const parser = validateParser(params.parser);
+    if (typeof parser !== 'string') {
+      return parser;
+    }
     const includeTags = params.includeTags !== false;
+    const shouldParse = params.parseIngredients !== false;
 
     const importKey = url.toString();
     if (!beginImport(importKey)) {
@@ -223,10 +349,15 @@ const importMealieRecipeUrl: Tool = {
     }
     try {
       const slug = await mealie.importRecipeFromUrl(importKey, includeTags);
+      // Embedded parse writes ONLY to the slug this import just created —
+      // never a pre-existing recipe (fresh imports are always unstructured,
+      // so the isRecipeParseEligible gate admits them and nothing else).
+      const parse = shouldParse ? await parseAndApplyIngredients(slug, parser) : undefined;
       return {
         imported: true,
         slug,
         url: mealie.recipeUrl(slug),
+        parse,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Mealie error';
@@ -237,4 +368,42 @@ const importMealieRecipeUrl: Tool = {
   },
 };
 
-export const mealieTools: Tool[] = [getMealieStatus, searchMealieRecipes, getMealieRecipe, importMealieRecipeUrl];
+const parseMealieRecipeIngredients: Tool = {
+  name: 'parse_mealie_recipe_ingredients',
+  description:
+    'Parse an unstructured Mealie recipe’s ingredient lines into structured quantity/unit/food and save them back (enables scaling and shopping-list merging). Only targets recipes that have never been parsed (machine imports); recipes with structured ingredients are refused to protect hand-curated data.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      slug: { type: 'string', description: 'Recipe slug to parse (must be an unstructured/machine-imported recipe)' },
+      parser: {
+        type: 'string',
+        enum: ['nlp', 'brute', 'openai'],
+        description: 'Ingredient parser: nlp (built-in, fast, default), brute, or openai (group AI provider)',
+        default: 'nlp',
+      },
+    },
+    required: ['slug'],
+  },
+  handler: async (params) => {
+    const slug = validateSlug(params.slug);
+    if (typeof slug !== 'string') {
+      return slug;
+    }
+    const parser = validateParser(params.parser);
+    if (typeof parser !== 'string') {
+      return parser;
+    }
+
+    const outcome = await parseAndApplyIngredients(slug, parser);
+    return { slug, url: mealie.recipeUrl(slug), ...outcome };
+  },
+};
+
+export const mealieTools: Tool[] = [
+  getMealieStatus,
+  searchMealieRecipes,
+  getMealieRecipe,
+  importMealieRecipeUrl,
+  parseMealieRecipeIngredients,
+];
