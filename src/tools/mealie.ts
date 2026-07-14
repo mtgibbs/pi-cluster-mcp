@@ -217,21 +217,26 @@ export function parseGuardKey(slug: string): string {
   return `parse:${slug}`;
 }
 
+// Scope gate for the parse mutation (same role as isDeploymentAllowed for
+// restart_deployment): parsing may ONLY target recipes that are still
+// unstructured — settings.disableAmount !== false, i.e. machine-imported and
+// never parsed. Recipes with structured (possibly hand-curated) ingredients
+// are refused unconditionally; there is no caller override. This closes the
+// tool's reachable set to unstructured→structured transitions only.
+export function isRecipeParseEligible(settings: Record<string, unknown> | undefined): boolean {
+  return (settings?.disableAmount ?? true) !== false;
+}
+
 // Parse a recipe's ingredient lines into structured quantity/unit/food and
 // write them back. Also flips settings.disableAmount off — imports set it
 // true, which is why imported ingredients render as plain text.
 //
-// Write scope (mutation gate): the PUT only replaces `recipeIngredient` —
-// derived exclusively from the recipe's OWN existing ingredient lines — and
-// `settings.disableAmount`. No caller-supplied content reaches the write;
-// `parser` merely selects Mealie's parsing backend. Recipes that already
-// have structured ingredients are refused unless `force` is set, so a
-// hand-curated recipe can't be silently clobbered.
-async function parseAndApplyIngredients(
-  slug: string,
-  parser: mealie.IngredientParser,
-  force: boolean
-): Promise<ParseOutcome> {
+// Write scope: the PUT only replaces `recipeIngredient` — derived exclusively
+// from the recipe's OWN existing ingredient lines — and `settings.disableAmount`.
+// No caller-supplied content reaches the write; `parser` merely selects
+// Mealie's parsing backend. The isRecipeParseEligible gate runs BEFORE any
+// mutation: structured recipes are refused with no override.
+async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientParser): Promise<ParseOutcome> {
   const guardKey = parseGuardKey(slug);
   if (!beginImport(guardKey)) {
     return { parsed: false, parser, error: `a parse for '${slug}' is already running — wait for it to finish` };
@@ -239,11 +244,11 @@ async function parseAndApplyIngredients(
   try {
     const recipe = await mealie.getRecipeRaw(slug);
     const settings = (recipe.settings as Record<string, unknown> | undefined) ?? {};
-    if (settings.disableAmount === false && !force) {
+    if (!isRecipeParseEligible(settings)) {
       return {
         parsed: false,
         parser,
-        error: `'${slug}' already has structured ingredients — pass force: true to re-parse and overwrite them`,
+        error: `'${slug}' already has structured ingredients — parsing is not allowed on structured recipes (edit them in the Mealie UI instead)`,
       };
     }
     const existing = (recipe.recipeIngredient as Record<string, unknown>[] | undefined) ?? [];
@@ -345,9 +350,9 @@ const importMealieRecipeUrl: Tool = {
     try {
       const slug = await mealie.importRecipeFromUrl(importKey, includeTags);
       // Embedded parse writes ONLY to the slug this import just created —
-      // never a pre-existing recipe (fresh imports always have
-      // disableAmount=true, so the no-force overwrite gate stays intact).
-      const parse = shouldParse ? await parseAndApplyIngredients(slug, parser, false) : undefined;
+      // never a pre-existing recipe (fresh imports are always unstructured,
+      // so the isRecipeParseEligible gate admits them and nothing else).
+      const parse = shouldParse ? await parseAndApplyIngredients(slug, parser) : undefined;
       return {
         imported: true,
         slug,
@@ -366,22 +371,16 @@ const importMealieRecipeUrl: Tool = {
 const parseMealieRecipeIngredients: Tool = {
   name: 'parse_mealie_recipe_ingredients',
   description:
-    'Parse an existing Mealie recipe’s ingredient lines into structured quantity/unit/food and save them back (enables scaling and shopping-list merging). Use on recipes imported before structured parsing existed, or to re-parse with a different parser.',
+    'Parse an unstructured Mealie recipe’s ingredient lines into structured quantity/unit/food and save them back (enables scaling and shopping-list merging). Only targets recipes that have never been parsed (machine imports); recipes with structured ingredients are refused to protect hand-curated data.',
   inputSchema: {
     type: 'object',
     properties: {
-      slug: { type: 'string', description: 'Recipe slug to parse' },
+      slug: { type: 'string', description: 'Recipe slug to parse (must be an unstructured/machine-imported recipe)' },
       parser: {
         type: 'string',
         enum: ['nlp', 'brute', 'openai'],
         description: 'Ingredient parser: nlp (built-in, fast, default), brute, or openai (group AI provider)',
         default: 'nlp',
-      },
-      force: {
-        type: 'boolean',
-        description:
-          'Required to re-parse a recipe that already has structured ingredients (overwrites them; original text lines are preserved in originalText). Default: false',
-        default: false,
       },
     },
     required: ['slug'],
@@ -396,7 +395,7 @@ const parseMealieRecipeIngredients: Tool = {
       return parser;
     }
 
-    const outcome = await parseAndApplyIngredients(slug, parser, params.force === true);
+    const outcome = await parseAndApplyIngredients(slug, parser);
     return { slug, url: mealie.recipeUrl(slug), ...outcome };
   },
 };

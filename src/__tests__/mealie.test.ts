@@ -6,6 +6,7 @@ import {
   beginImport,
   endImport,
   parseGuardKey,
+  isRecipeParseEligible,
 } from '../tools/mealie.js';
 
 function isError(v: unknown): boolean {
@@ -81,6 +82,18 @@ describe('mealie import active-run guard', () => {
   it('parse guard keys never collide with import URL keys', () => {
     expect(parseGuardKey('gyudon')).not.toBe('gyudon');
     expect(parseGuardKey('gyudon').startsWith('parse:')).toBe(true);
+  });
+});
+
+describe('mealie parse scope gate', () => {
+  it('admits unstructured (machine-imported) recipes', () => {
+    expect(isRecipeParseEligible({ disableAmount: true })).toBe(true);
+    expect(isRecipeParseEligible({})).toBe(true);
+    expect(isRecipeParseEligible(undefined)).toBe(true);
+  });
+
+  it('refuses recipes that already have structured ingredients — no override', () => {
+    expect(isRecipeParseEligible({ disableAmount: false })).toBe(false);
   });
 });
 
