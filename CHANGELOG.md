@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.21...homelab-mcp-v0.1.22) (2026-07-14)
+
+
+### Features
+
+* Mealie recipe tools (status, search, get, import-from-URL) ([#38](https://github.com/mtgibbs/pi-cluster-mcp/issues/38)) ([40aa9da](https://github.com/mtgibbs/pi-cluster-mcp/commit/40aa9dad76627a392f36aee94b715f22b5072ad2))
+
 ## [0.1.21](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.20...homelab-mcp-v0.1.21) (2026-03-02)
 
 
