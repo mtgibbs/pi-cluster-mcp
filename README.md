@@ -123,7 +123,7 @@ The server is designed to be deployed as a Pod in your cluster.
 | **Movies (Radarr)** | `get_radarr_queue`, `get_radarr_history`, `search_radarr_movie` |
 | **Downloads (SABnzbd)** | `get_sabnzbd_queue`, `get_sabnzbd_history`, `retry_sabnzbd_download`, `pause_resume_sabnzbd` |
 | **Arr Shared** | `get_quality_profile`, `reject_and_search` |
-| **Recipes (Mealie)** | `get_mealie_status`, `search_mealie_recipes`, `get_mealie_recipe`, `import_mealie_recipe_url` |
+| **Recipes (Mealie)** | `get_mealie_status`, `search_mealie_recipes`, `get_mealie_recipe`, `import_mealie_recipe_url`, `parse_mealie_recipe_ingredients` |
 | **Backups** | `get_backup_status`, `trigger_backup`, `get_cronjob_details`, `get_job_logs` |
 | **Secrets** | `get_secrets_status`, `refresh_secret` |
 | **Storage** | `get_pvcs` |

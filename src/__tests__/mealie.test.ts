@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateImportUrl, validateSlug, beginImport, endImport } from '../tools/mealie.js';
+import { validateImportUrl, validateSlug, validateParser, beginImport, endImport } from '../tools/mealie.js';
 
 function isError(v: unknown): boolean {
   return typeof v === 'object' && v !== null && (v as { error?: boolean }).error === true;
@@ -58,6 +58,25 @@ describe('mealie import active-run guard', () => {
     expect(beginImport('https://example.com/b')).toBe(true);
     endImport('https://example.com/a');
     endImport('https://example.com/b');
+  });
+});
+
+describe('mealie parser validation', () => {
+  it('defaults to nlp when omitted', () => {
+    expect(validateParser(undefined)).toBe('nlp');
+    expect(validateParser(null)).toBe('nlp');
+  });
+
+  it('accepts known parsers', () => {
+    expect(validateParser('nlp')).toBe('nlp');
+    expect(validateParser('brute')).toBe('brute');
+    expect(validateParser('openai')).toBe('openai');
+  });
+
+  it('rejects unknown parsers', () => {
+    expect(isError(validateParser('gpt4'))).toBe(true);
+    expect(isError(validateParser(42))).toBe(true);
+    expect(isError(validateParser(''))).toBe(true);
   });
 });
 

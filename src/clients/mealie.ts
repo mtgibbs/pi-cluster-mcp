@@ -125,3 +125,41 @@ export async function importRecipeFromUrl(url: string, includeTags: boolean): Pr
     body: JSON.stringify({ url, includeTags }),
   });
 }
+
+// Ingredient parsing (POST /api/parser/ingredients). The parser matches
+// foods/units against the group's existing records; unmatched ones come back
+// as create-by-name objects, which the recipe PUT accepts and creates.
+
+export type IngredientParser = 'nlp' | 'brute' | 'openai';
+
+export interface ParsedIngredient {
+  input?: string | null;
+  confidence?: { average?: number | null };
+  ingredient: {
+    quantity?: number | null;
+    unit?: { id?: string; name: string } | null;
+    food?: { id?: string; name: string } | null;
+    note?: string | null;
+    display?: string;
+  };
+}
+
+export async function parseIngredients(parser: IngredientParser, ingredients: string[]): Promise<ParsedIngredient[]> {
+  return mealieFetch<ParsedIngredient[]>('/parser/ingredients', {
+    method: 'POST',
+    body: JSON.stringify({ parser, ingredients }),
+  });
+}
+
+// Raw recipe JSON round-trip for structured updates. The full Recipe payload
+// is much larger than our trimmed Recipe interface, so treat it as opaque.
+export async function getRecipeRaw(slug: string): Promise<Record<string, unknown>> {
+  return mealieFetch<Record<string, unknown>>(`/recipes/${encodeURIComponent(slug)}`);
+}
+
+export async function updateRecipeRaw(slug: string, recipe: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return mealieFetch<Record<string, unknown>>(`/recipes/${encodeURIComponent(slug)}`, {
+    method: 'PUT',
+    body: JSON.stringify(recipe),
+  });
+}
