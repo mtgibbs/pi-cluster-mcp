@@ -112,36 +112,47 @@ async function authenticate(): Promise<string | null> {
     return null;
   }
 
+  // A password IS configured, so from here on failure is a real error and must be reported as
+  // one. Returning null instead would silently downgrade the caller to an unauthenticated
+  // request, and the endpoint would answer 401 — which reads as "the stats endpoint is broken"
+  // rather than "your Pi-hole password is wrong". That misdirection hid a stale credential for
+  // months; see pi-cluster-mcp#44.
+  let response: Response;
   try {
-    const response = await fetch(`${PIHOLE_URL}/api/auth`, {
+    response = await fetch(`${PIHOLE_URL}/api/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: PIHOLE_PASSWORD }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Auth failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json() as AuthResponse;
-
-    if (!data.session.valid || !data.session.sid) {
-      // No password set on Pi-hole, or auth failed
-      sessionId = null;
-      return null;
-    }
-
-    sessionId = data.session.sid;
-    // Set expiry 30 seconds before actual expiry to be safe
-    const validity = data.session.validity || 300;
-    sessionExpiry = Date.now() + (validity - 30) * 1000;
-
-    return sessionId;
   } catch (error) {
-    console.error('Pi-hole auth error:', error);
     sessionId = null;
-    return null;
+    throw new Error(
+      `Pi-hole auth request to ${PIHOLE_URL}/api/auth failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
+
+  if (!response.ok) {
+    sessionId = null;
+    throw new Error(
+      `Pi-hole auth failed: ${response.status} ${response.statusText} — PIHOLE_API_TOKEN must equal the Pi-hole web password (v6 authenticates via POST /api/auth)`,
+    );
+  }
+
+  const data = (await response.json()) as AuthResponse;
+
+  if (!data.session.valid || !data.session.sid) {
+    sessionId = null;
+    throw new Error(
+      'Pi-hole auth rejected: no valid session returned — PIHOLE_API_TOKEN must equal the Pi-hole web password (v6 authenticates via POST /api/auth)',
+    );
+  }
+
+  sessionId = data.session.sid;
+  // Set expiry 30 seconds before actual expiry to be safe
+  const validity = data.session.validity || 300;
+  sessionExpiry = Date.now() + (validity - 30) * 1000;
+
+  return sessionId;
 }
 
 async function piholeFetch<T>(endpoint: string, requiresAuth = true): Promise<T> {
@@ -229,7 +240,10 @@ function convertStatsToLegacy(stats: StatsResponse): PiholeStats {
 }
 
 export async function getSummary(): Promise<PiholeStats> {
-  const stats = await piholeFetch<StatsResponse>('stats/summary', false);
+  // NOTE: `stats/summary` REQUIRES a session in Pi-hole v6. It was readable without one in
+  // v5, and passing `requiresAuth = false` here is what made get_dns_status report
+  // `statsError: 401` for months — independent of whether the credential was valid.
+  const stats = await piholeFetch<StatsResponse>('stats/summary');
   return convertStatsToLegacy(stats);
 }
 
@@ -253,8 +267,8 @@ export async function getTopItems(count = 10): Promise<{ top_queries: Record<str
 }
 
 export async function getQueryTypes(): Promise<{ querytypes: Record<string, number> }> {
-  // Query types are included in the stats summary in v6
-  const stats = await piholeFetch<StatsResponse>('stats/summary', false);
+  // Query types are included in the stats summary in v6 (which requires auth — see getSummary)
+  const stats = await piholeFetch<StatsResponse>('stats/summary');
   const querytypes: Record<string, number> = {};
 
   const total = stats.queries.total || 1;
@@ -267,7 +281,7 @@ export async function getQueryTypes(): Promise<{ querytypes: Record<string, numb
 
 export async function getStatus(): Promise<{ status: string }> {
   try {
-    const stats = await piholeFetch<StatsResponse>('stats/summary', false);
+    const stats = await piholeFetch<StatsResponse>('stats/summary');
     return { status: stats.queries ? 'enabled' : 'disabled' };
   } catch {
     return { status: 'error' };
