@@ -20,7 +20,15 @@ const getDnsStatus: Tool = {
     const includeStats = params.includeStats !== false;
 
     try {
-      const pods = await listPods(PIHOLE_NAMESPACE);
+      const allPods = await listPods(PIHOLE_NAMESPACE);
+
+      // Exclude Job-owned pods (the brainrot-allow/-block CronJobs, gravity updates, …). A
+      // completed Job pod sits in phase Succeeded with Ready=False forever, and counting those
+      // in `every(p => p.ready)` pinned `healthy` to false while every Pi-hole was serving
+      // fine — a permanent false alarm that trained readers to ignore the flag.
+      const pods = allPods.filter(
+        (p) => !p.metadata?.ownerReferences?.some((ref) => ref.kind === 'Job'),
+      );
 
       const piholePods = pods
         .filter((p) => p.metadata?.name?.includes('pihole') && !p.metadata?.name?.includes('unbound'))
@@ -45,6 +53,15 @@ const getDnsStatus: Tool = {
         unbound: unboundPods,
         healthy: piholePods.every((p) => p.ready) && unboundPods.every((p) => p.ready),
       };
+
+      // Job pods are out of the health verdict, but a FAILED one is still worth seeing.
+      const failedJobPods = allPods
+        .filter((p) => p.metadata?.ownerReferences?.some((ref) => ref.kind === 'Job'))
+        .filter((p) => p.status?.phase === 'Failed')
+        .map((p) => p.metadata?.name);
+      if (failedJobPods.length > 0) {
+        result.failedJobs = failedJobPods;
+      }
 
       // Fetch Pi-hole stats and diagnostics if requested and Pi-hole is healthy
       if (includeStats && piholePods.some((p) => p.ready)) {

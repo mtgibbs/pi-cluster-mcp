@@ -110,6 +110,62 @@ describe('pihole client — authentication', () => {
     expect(authCalls).toHaveLength(1);
   });
 
+  it('performs ONE login for a burst of concurrent requests (see #48)', async () => {
+    // The live failure: get_dns_status fans out parallel requests, each missed the
+    // not-yet-populated session cache, and each fired its own POST /api/auth. FTL logged
+    // "Rate-limiting login attempts" once per concurrent call and 429'd them all.
+    const fetchMock = vi.fn((input: string | URL) =>
+      Promise.resolve(String(input).includes('/api/auth') ? authOk() : statsOk()));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getSummary } = await loadClient();
+    await Promise.all([getSummary(), getSummary(), getSummary(), getSummary()]);
+
+    const authCalls = fetchMock.mock.calls.filter(([u]) => String(u).includes('/api/auth'));
+    expect(authCalls, 'concurrent callers must share a single login').toHaveLength(1);
+  });
+
+  it('reports a 429 as throttling, not as a bad password', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL) => {
+      if (String(input).includes('/api/auth')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { key: 'rate_limiting', message: 'Too many requests' } }), {
+            status: 429,
+          }),
+        );
+      }
+      return Promise.resolve(statsOk());
+    }));
+
+    const { getSummary } = await loadClient();
+
+    await expect(getSummary()).rejects.toThrow(/rate-limit/i);
+    // The whole point: this error must NOT send anyone off to rotate a valid credential.
+    await expect(getSummary()).rejects.not.toThrow(/must equal the Pi-hole web password/);
+  });
+
+  it('stops attempting logins while rate-limited, instead of re-arming the limiter', async () => {
+    const fetchMock = vi.fn((input: string | URL) => {
+      if (String(input).includes('/api/auth')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { key: 'rate_limiting' } }), { status: 429 }),
+        );
+      }
+      return Promise.resolve(statsOk());
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getSummary } = await loadClient();
+
+    // Retrying inside the cooldown is what turned one burst into a self-sustaining lockout.
+    await expect(getSummary()).rejects.toThrow(/rate-limit/i);
+    await expect(getSummary()).rejects.toThrow(/suppressed/i);
+    await expect(getSummary()).rejects.toThrow(/suppressed/i);
+
+    const authCalls = fetchMock.mock.calls.filter(([u]) => String(u).includes('/api/auth'));
+    expect(authCalls, 'must not keep hammering /api/auth once throttled').toHaveLength(1);
+  });
+
   it('still allows unauthenticated calls when no password is configured', async () => {
     vi.stubEnv('PIHOLE_API_TOKEN', '');
     vi.stubEnv('PIHOLE_PASSWORD', '');

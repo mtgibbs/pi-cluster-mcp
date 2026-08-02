@@ -7,6 +7,13 @@ const PIHOLE_PASSWORD = process.env.PIHOLE_API_TOKEN || process.env.PIHOLE_PASSW
 // Session management
 let sessionId: string | null = null;
 let sessionExpiry: number = 0;
+// Shared across concurrent callers so a burst of parallel requests performs ONE login.
+let authInFlight: Promise<string | null> | null = null;
+// Set when FTL answers 429; suppresses further login attempts until it elapses.
+let rateLimitedUntil: number = 0;
+
+// How long to stop attempting logins after FTL rate-limits us, when it sends no Retry-After.
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
 
 interface AuthResponse {
   session: {
@@ -101,6 +108,19 @@ interface MessagesResponse {
   took: number;
 }
 
+/** Pi-hole error bodies are `{ error: { key, message, hint } }`. Best-effort — never throws. */
+async function readErrorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { key?: string; message?: string } };
+    const key = body.error?.key;
+    const message = body.error?.message;
+    const detail = [key, message].filter(Boolean).join(': ');
+    return detail ? ` (${detail})` : '';
+  } catch {
+    return '';
+  }
+}
+
 async function authenticate(): Promise<string | null> {
   // Check if we have a valid session
   if (sessionId && Date.now() < sessionExpiry) {
@@ -112,11 +132,46 @@ async function authenticate(): Promise<string | null> {
     return null;
   }
 
-  // A password IS configured, so from here on failure is a real error and must be reported as
-  // one. Returning null instead would silently downgrade the caller to an unauthenticated
-  // request, and the endpoint would answer 401 — which reads as "the stats endpoint is broken"
-  // rather than "your Pi-hole password is wrong". That misdirection hid a stale credential for
-  // months; see pi-cluster-mcp#44.
+  // FTL rate-limits login attempts, and retrying inside that window only re-arms the limiter —
+  // which is how a single burst turned into a self-sustaining lockout (see pi-cluster-mcp#48).
+  // Fail fast without touching the network until the cooldown elapses.
+  if (Date.now() < rateLimitedUntil) {
+    const seconds = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+    throw new Error(
+      `Pi-hole auth suppressed: FTL is rate-limiting login attempts; not retrying for ${seconds}s. ` +
+        'This is throttling, NOT a bad credential — do not rotate PIHOLE_API_TOKEN on this error.',
+    );
+  }
+
+  // Concurrent callers must share one login. get_dns_status alone fans out two parallel requests
+  // (getFullStats + getMessages, itself fanning out three more), and every one of them missed the
+  // not-yet-populated cache and fired its own POST /api/auth — tripping the limiter that then
+  // failed them all. Single-flight collapses that burst into one attempt.
+  if (authInFlight) {
+    return authInFlight;
+  }
+
+  const attempt = login();
+  authInFlight = attempt;
+  try {
+    return await attempt;
+  } finally {
+    if (authInFlight === attempt) {
+      authInFlight = null;
+    }
+  }
+}
+
+/**
+ * Perform the actual login. Only ever called via `authenticate()`, which serializes it.
+ *
+ * A password IS configured by this point, so failure is a real error and must be reported as
+ * one. Returning null instead would silently downgrade the caller to an unauthenticated
+ * request, and the endpoint would answer 401 — which reads as "the stats endpoint is broken"
+ * rather than "your Pi-hole password is wrong". That misdirection hid a stale credential for
+ * months; see pi-cluster-mcp#44.
+ */
+async function login(): Promise<string | null> {
   let response: Response;
   try {
     response = await fetch(`${PIHOLE_URL}/api/auth`, {
@@ -131,10 +186,27 @@ async function authenticate(): Promise<string | null> {
     );
   }
 
+  // 429 is throttling, not a rejected credential. Blaming the password here would send the next
+  // reader off to rotate a perfectly good secret — the same misdirection #44 was about, pointed
+  // at a different cause.
+  if (response.status === 429) {
+    sessionId = null;
+    const retryAfter = Number(response.headers.get('retry-after'));
+    const cooldownMs =
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : RATE_LIMIT_COOLDOWN_MS;
+    rateLimitedUntil = Date.now() + cooldownMs;
+    const detail = await readErrorDetail(response);
+    throw new Error(
+      `Pi-hole auth rate-limited: 429 Too Many Requests${detail} — FTL is throttling login attempts; ` +
+        `backing off for ${Math.round(cooldownMs / 1000)}s. This is NOT a bad credential.`,
+    );
+  }
+
   if (!response.ok) {
     sessionId = null;
+    const detail = await readErrorDetail(response);
     throw new Error(
-      `Pi-hole auth failed: ${response.status} ${response.statusText} — PIHOLE_API_TOKEN must equal the Pi-hole web password (v6 authenticates via POST /api/auth)`,
+      `Pi-hole auth failed: ${response.status} ${response.statusText}${detail} — PIHOLE_API_TOKEN must equal the Pi-hole web password (v6 authenticates via POST /api/auth)`,
     );
   }
 
@@ -148,6 +220,7 @@ async function authenticate(): Promise<string | null> {
   }
 
   sessionId = data.session.sid;
+  rateLimitedUntil = 0;
   // Set expiry 30 seconds before actual expiry to be safe
   const validity = data.session.validity || 300;
   sessionExpiry = Date.now() + (validity - 30) * 1000;
