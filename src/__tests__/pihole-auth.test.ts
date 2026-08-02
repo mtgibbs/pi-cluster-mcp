@@ -60,10 +60,10 @@ describe('pihole client — authentication', () => {
   it('sends a session id on stats/summary (v6 requires auth — see #44)', async () => {
     const seen: Array<{ url: string; headers: Record<string, string> }> = [];
 
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL, init?: RequestInit) => {
       const url = String(input);
       seen.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
-      return url.includes('/api/auth') ? authOk() : statsOk();
+      return Promise.resolve(url.includes('/api/auth') ? authOk() : statsOk());
     }));
 
     const { getSummary } = await loadClient();
@@ -76,14 +76,18 @@ describe('pihole client — authentication', () => {
   });
 
   it('throws a diagnosable error when the password is wrong, rather than silently degrading', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL) => {
       const url = String(input);
       if (url.includes('/api/auth')) {
-        return new Response(JSON.stringify({ error: { key: 'unauthorized' } }), { status: 401 });
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { key: 'unauthorized' } }), { status: 401 }),
+        );
       }
       // If auth were swallowed, the client would land here unauthenticated and get a 401
       // that looks like a broken stats endpoint. Failing loudly is the point.
-      return new Response(JSON.stringify({ error: { key: 'unauthorized' } }), { status: 401 });
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { key: 'unauthorized' } }), { status: 401 }),
+      );
     }));
 
     const { getSummary } = await loadClient();
@@ -94,8 +98,8 @@ describe('pihole client — authentication', () => {
   });
 
   it('reuses a cached session instead of re-authenticating on every call', async () => {
-    const fetchMock = vi.fn(async (input: string | URL) =>
-      String(input).includes('/api/auth') ? authOk() : statsOk());
+    const fetchMock = vi.fn((input: string | URL) =>
+      Promise.resolve(String(input).includes('/api/auth') ? authOk() : statsOk()));
     vi.stubGlobal('fetch', fetchMock);
 
     const { getSummary } = await loadClient();
@@ -111,9 +115,9 @@ describe('pihole client — authentication', () => {
     vi.stubEnv('PIHOLE_PASSWORD', '');
 
     const seen: Array<string> = [];
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL) => {
       seen.push(String(input));
-      return statsOk();
+      return Promise.resolve(statsOk());
     }));
 
     const { getSummary } = await loadClient();
