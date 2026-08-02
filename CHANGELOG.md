@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.26](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.25...homelab-mcp-v0.1.26) (2026-08-02)
+
+
+### Bug Fixes
+
+* **dns:** stop counting completed CronJob pods against Pi-hole's health verdict ([34ed813](https://github.com/mtgibbs/pi-cluster-mcp/commit/34ed8131ccfaab442c7a73c9c3465b9c6b235282))
+* **pihole:** single-flight login (429 lockout) + stop counting Job pods as unhealthy ([0d5b814](https://github.com/mtgibbs/pi-cluster-mcp/commit/0d5b8147fd9a76f03189ea418663425981b99b7e))
+* **pihole:** single-flight login so concurrent requests stop tripping FTL's rate limiter ([#48](https://github.com/mtgibbs/pi-cluster-mcp/issues/48)) ([8d86d3c](https://github.com/mtgibbs/pi-cluster-mcp/commit/8d86d3cd3329e51b41c991ce344d4d0feca55d99))
+
 ## [0.1.25](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.24...homelab-mcp-v0.1.25) (2026-08-02)
 
 
