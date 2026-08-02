@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.25](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.24...homelab-mcp-v0.1.25) (2026-08-02)
+
+
+### Bug Fixes
+
+* **pihole:** authenticate stats/summary — Pi-hole v6 requires a session ([#44](https://github.com/mtgibbs/pi-cluster-mcp/issues/44)) ([#46](https://github.com/mtgibbs/pi-cluster-mcp/issues/46)) ([31ef9bd](https://github.com/mtgibbs/pi-cluster-mcp/commit/31ef9bd1d2b4073fb09307552d2ea8e37246503d))
+
 ## [0.1.24](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.23...homelab-mcp-v0.1.24) (2026-07-14)
 
 
