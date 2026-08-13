@@ -101,6 +101,23 @@ describe('deployment whitelist', () => {
     expect(isDeploymentAllowed('uptime-kuma', 'uptime-kuma')).toBe(true);
   });
 
+  it('allows the external-secrets controller (infra exception)', () => {
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets')).toBe(true);
+  });
+
+  it('still rejects the rest of the external-secrets namespace', () => {
+    // Only the controller is allowed; the webhook and cert-controller are not, and
+    // restarting the webhook can block every admission request in the cluster.
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets-webhook')).toBe(false);
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets-cert-controller')).toBe(false);
+  });
+
+  it('still rejects the Flux controllers', () => {
+    expect(isDeploymentAllowed('flux-system', 'source-controller')).toBe(false);
+    expect(isDeploymentAllowed('flux-system', 'kustomize-controller')).toBe(false);
+    expect(isDeploymentAllowed('flux-system', 'image-automation-controller')).toBe(false);
+  });
+
   it('rejects non-whitelisted deployments', () => {
     expect(isDeploymentAllowed('kube-system', 'coredns')).toBe(false);
     expect(isDeploymentAllowed('default', 'anything')).toBe(false);
@@ -109,7 +126,7 @@ describe('deployment whitelist', () => {
 
   it('returns all allowed deployments', () => {
     const allowed = getAllowedDeployments();
-    expect(allowed).toHaveLength(20);
+    expect(allowed).toHaveLength(21);
     expect(allowed).toContain('jellyfin/jellyfin');
     expect(allowed).toContain('media/sonarr');
     expect(allowed).toContain('media/radarr');
