@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.26...homelab-mcp-v0.2.0) (2026-09-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* the default response shape of the six tools above changed; pass detail:"full" for the previous output.
+
+### Features
+
+* **cluster:** allow rolling-restart of the external-secrets controller ([ea630e5](https://github.com/mtgibbs/pi-cluster-mcp/commit/ea630e53f9ea06f74a120e8e3c7aa3cad141637c))
+* summary-first output for list tools ([bfb1018](https://github.com/mtgibbs/pi-cluster-mcp/commit/bfb1018a94aff29ee07fa2deb8f75a33eb71d8e6))
+
 ## [0.1.26](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.25...homelab-mcp-v0.1.26) (2026-08-02)
 
 
