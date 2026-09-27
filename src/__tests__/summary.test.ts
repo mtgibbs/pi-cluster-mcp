@@ -4,12 +4,22 @@ import { summarizeQueue, parseQuantity, capList, getDetail } from '../utils/summ
 const listCluster = vi.fn();
 const listPvcs = vi.fn();
 vi.mock('../clients/kubernetes.js', () => ({
-  getCustomObjectsApi: () => ({ listClusterCustomObject: listCluster }),
-  getCoreApi: () => ({ listPersistentVolumeClaimForAllNamespaces: listPvcs }),
+  getCustomObjectsApi: (): unknown => ({ listClusterCustomObject: listCluster }),
+  getCoreApi: (): unknown => ({ listPersistentVolumeClaimForAllNamespaces: listPvcs }),
 }));
 
 const sonarrQueue = vi.fn();
-vi.mock('../clients/sonarr.js', () => ({ getQueue: () => sonarrQueue() }));
+vi.mock('../clients/sonarr.js', () => ({ getQueue: (): unknown => sonarrQueue() as unknown }));
+
+interface Named { name: string }
+interface FluxSummary {
+  summary: { kustomizations: { total: number; ready: number; notReady: number } };
+  allReady?: boolean;
+  notReady?: { kustomizations: Named[] };
+  kustomizations?: Named[];
+}
+interface PvcSummary { largest: Named[]; allBound: boolean; notBound: Named[]; pvcs?: unknown[] }
+interface QueueResult { summary: { byState: Record<string, number> }; groups: Array<{ count: number }>; items?: unknown[] }
 
 const { tools } = await import('../tools/index.js');
 const tool = (name: string): (p: Record<string, unknown>) => Promise<unknown> => {
@@ -92,18 +102,18 @@ describe('get_flux_status', () => {
   it('summary: counts computed server-side, only not-Ready listed', async () => {
     listCluster.mockImplementation((_g: string, _v: string, plural: string) =>
       Promise.resolve(plural === 'kustomizations' ? fluxItems(ks, ['ks-7']) : fluxItems(['hr-a', 'hr-b'])));
-    const r = await tool('get_flux_status')({}) as Record<string, any>;
+    const r = await tool('get_flux_status')({}) as FluxSummary;
     expect(r.summary.kustomizations).toEqual({ total: 41, ready: 40, notReady: 1 });
     expect(r.allReady).toBe(false);
-    expect(r.notReady.kustomizations).toHaveLength(1);
-    expect(r.notReady.kustomizations[0].name).toBe('ks-7');
+    expect(r.notReady?.kustomizations).toHaveLength(1);
+    expect(r.notReady?.kustomizations[0].name).toBe('ks-7');
     expect(r.kustomizations).toBeUndefined();
   });
 
   it('full: still returns every resource (positive control)', async () => {
     listCluster.mockImplementation((_g: string, _v: string, plural: string) =>
       Promise.resolve(plural === 'kustomizations' ? fluxItems(ks) : fluxItems(['hr-a'])));
-    const r = await tool('get_flux_status')({ detail: 'full' }) as Record<string, any>;
+    const r = await tool('get_flux_status')({ detail: 'full' }) as FluxSummary;
     expect(r.kustomizations).toHaveLength(41);
     expect(r.summary.kustomizations.total).toBe(41);
   });
@@ -117,10 +127,10 @@ describe('get_pvcs', () => {
 
   it('summary: largest sorted by real size, not string order', async () => {
     listPvcs.mockResolvedValue({ body: { items: [pvc('small', '100Mi'), pvc('big', '1Ti'), pvc('mid', '500Gi'), pvc('stuck', '2Gi', 'Pending')] } });
-    const r = await tool('get_pvcs')({}) as Record<string, any>;
-    expect(r.largest.map((p: { name: string }) => p.name)).toEqual(['big', 'mid', 'stuck', 'small']);
+    const r = await tool('get_pvcs')({}) as PvcSummary;
+    expect(r.largest.map((p) => p.name)).toEqual(['big', 'mid', 'stuck', 'small']);
     expect(r.allBound).toBe(false);
-    expect(r.notBound.map((p: { name: string }) => p.name)).toEqual(['stuck']);
+    expect(r.notBound.map((p) => p.name)).toEqual(['stuck']);
     expect(r.pvcs).toBeUndefined();
   });
 });
@@ -134,12 +144,12 @@ describe('get_sonarr_queue', () => {
     }));
     sonarrQueue.mockResolvedValue({ totalRecords: 27, records });
 
-    const s = await tool('get_sonarr_queue')({}) as Record<string, any>;
+    const s = await tool('get_sonarr_queue')({}) as QueueResult;
     expect(s.summary.byState).toEqual({ importBlocked: 14, importPending: 13 });
     expect(s.groups[0].count).toBe(13);
     expect(s.items).toBeUndefined();
 
-    const f = await tool('get_sonarr_queue')({ detail: 'full' }) as Record<string, any>;
+    const f = await tool('get_sonarr_queue')({ detail: 'full' }) as QueueResult;
     expect(f.items).toHaveLength(27);
   });
 });
