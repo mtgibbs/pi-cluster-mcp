@@ -336,6 +336,26 @@ flux reconcile kustomization mcp-homelab
 - Push to ghcr.io/mtgibbs/homelab-mcp
 - Create GitHub release
 
+## Response Conventions: Summary-First
+
+Tools are called by small local models (e.g. `hot-coder` via Goose) as well as Claude. Small
+models relay verdicts well but miscount long lists and exhaust context on big payloads, so
+**list tools do the counting, grouping and filtering themselves** (`src/utils/summary.ts`):
+
+- Take `...DETAIL_PARAM` in the input schema. `detail: "summary"` (the default) returns
+  pre-computed counts, a boolean verdict (`allReady` / `allSynced` / `allBound` / `allHealthy`),
+  and **only the items needing attention**; healthy items are counted, not listed.
+  `detail: "full"` returns every item, in the pre-existing shape.
+- Group identical items instead of repeating them (`summarizeQueue`: title + state + reason → one
+  row with a `count` and the `queueIds`).
+- Cap lists with `capList` and say how to get the rest; no single response should be huge.
+- If a tool states a conclusion, it must be correct — small models repeat tool conclusions verbatim.
+
+Adopted by: `get_flux_status`, `get_certificate_status`, `get_secrets_status`, `get_pvcs`,
+`get_sonarr_queue`, `get_radarr_queue`. `get_backup_status` (a short list) keeps its items and
+adds a computed `lastRunFailed` per job. Measured by the read-only exam in pi-cluster
+`docs/research/goose-hot-coder-eval/`.
+
 ## Adding New Tools
 
 1. Create tool implementation in `src/tools/<category>.ts`:

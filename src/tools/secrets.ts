@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
 import { k8sError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
 
 interface ExternalSecret {
   metadata: {
@@ -25,12 +26,12 @@ interface ExternalSecretList {
 
 const getSecretsStatus: Tool = {
   name: 'get_secrets_status',
-  description: 'Get External Secrets sync status',
+  description: 'Get External Secrets sync status. Returns synced/failed counts and only the failing ExternalSecrets by default.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: { ...DETAIL_PARAM },
   },
-  handler: async () => {
+  handler: async (params) => {
     try {
       const api = getCustomObjectsApi();
 
@@ -50,6 +51,19 @@ const getSecretsStatus: Tool = {
       });
 
       const failedSecrets = secrets.filter((s) => !s.ready);
+
+      if (getDetail(params) === 'summary') {
+        return {
+          summary: {
+            total: secrets.length,
+            synced: secrets.length - failedSecrets.length,
+            failed: failedSecrets.length,
+          },
+          allSynced: failedSecrets.length === 0,
+          failures: failedSecrets,
+          note: OMITTED_NOTE,
+        };
+      }
 
       return {
         externalSecrets: secrets,

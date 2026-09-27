@@ -1,16 +1,18 @@
 import type { Tool } from './index.js';
 import { getCoreApi } from '../clients/kubernetes.js';
 import { validationError, k8sError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, OMITTED_NOTE, parseQuantity } from '../utils/summary.js';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
 const getPvcs: Tool = {
   name: 'get_pvcs',
-  description: 'List PersistentVolumeClaims with status, capacity, storage class, and bound volume info. Useful for diagnosing storage issues like pending or lost PVCs.',
+  description: 'List PersistentVolumeClaims with status, capacity, storage class, and bound volume info. Useful for diagnosing storage issues like pending or lost PVCs. Returns counts, any PVC not Bound, and the ten largest by capacity by default.',
   inputSchema: {
     type: 'object',
     properties: {
       namespace: { type: 'string', description: 'Namespace to list PVCs from (omit for all namespaces)' },
+      ...DETAIL_PARAM,
     },
   },
   handler: async (params) => {
@@ -46,7 +48,21 @@ const getPvcs: Tool = {
         lost: pvcs.filter((p) => p.status === 'Lost').length,
       };
 
-      return { pvcs, summary };
+      if (getDetail(params) === 'full') {
+        return { pvcs, summary };
+      }
+
+      const largest = [...pvcs]
+        .sort((a, b) => (parseQuantity(b.capacity) || 0) - (parseQuantity(a.capacity) || 0))
+        .slice(0, 10)
+        .map((p) => ({ name: p.name, namespace: p.namespace, capacity: p.capacity, storageClass: p.storageClass }));
+      return {
+        summary,
+        allBound: summary.bound === summary.total,
+        notBound: pvcs.filter((p) => p.status !== 'Bound'),
+        largest,
+        note: OMITTED_NOTE,
+      };
     } catch (error) {
       return k8sError(error);
     }
