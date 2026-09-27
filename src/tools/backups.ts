@@ -30,7 +30,7 @@ function sanitizeEnvFrom(envFrom: k8s.V1EnvFromSource[] | undefined): Array<{ ty
 
 const getBackupStatus: Tool = {
   name: 'get_backup_status',
-  description: 'Get backup CronJob status including schedules and last run times',
+  description: 'Get backup CronJob status including schedules, last run times, and a computed lastRunFailed verdict per job',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -55,15 +55,26 @@ const getBackupStatus: Tool = {
           lastScheduleTime: cj.status?.lastScheduleTime,
           lastSuccessfulTime: cj.status?.lastSuccessfulTime,
           activeJobs: cj.status?.active?.length || 0,
+          // Verdict computed here, not left to the caller: the most recent
+          // scheduled run has not succeeded (and isn't still running).
+          lastRunFailed:
+            !cj.status?.active?.length &&
+            !!cj.status?.lastScheduleTime &&
+            (!cj.status?.lastSuccessfulTime ||
+              new Date(cj.status.lastSuccessfulTime) < new Date(cj.status.lastScheduleTime)),
         }));
 
+      const failed = backupJobs.filter((j: { lastRunFailed: boolean }) => j.lastRunFailed);
       return {
         cronJobs: backupJobs,
         summary: {
           total: backupJobs.length,
           suspended: backupJobs.filter((j: { suspended: boolean }) => j.suspended).length,
           active: backupJobs.filter((j: { activeJobs: number }) => j.activeJobs > 0).length,
+          lastRunFailed: failed.length,
         },
+        allHealthy: failed.length === 0,
+        failures: failed.map((j: { name?: string; namespace?: string }) => `${j.namespace}/${j.name}`),
       };
     } catch (error) {
       return k8sError(error);

@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
 import { k8sError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
 
 interface Certificate {
   metadata: {
@@ -30,12 +31,12 @@ interface CertificateList {
 
 const getCertificateStatus: Tool = {
   name: 'get_certificate_status',
-  description: 'Get TLS certificate status from cert-manager including expiry and pending challenges',
+  description: 'Get TLS certificate status from cert-manager including expiry and pending challenges. Returns counts, not-Ready/expiring (<30d) certs and the next three to expire by default.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: { ...DETAIL_PARAM },
   },
-  handler: async () => {
+  handler: async (params) => {
     try {
       const api = getCustomObjectsApi();
 
@@ -69,14 +70,31 @@ const getCertificateStatus: Tool = {
 
       const notReadyCerts = certs.filter((c) => !c.ready);
 
+      const summary = {
+        total: certs.length,
+        ready: certs.filter((c) => c.ready).length,
+        expiringSoon: expiringCerts.length,
+        notReady: notReadyCerts.length,
+      };
+
+      if (getDetail(params) === 'summary') {
+        const nextToExpire = certs
+          .filter((c) => c.daysUntilExpiry !== null)
+          .sort((a, b) => (a.daysUntilExpiry as number) - (b.daysUntilExpiry as number))
+          .slice(0, 3)
+          .map((c) => ({ name: c.name, namespace: c.namespace, daysUntilExpiry: c.daysUntilExpiry, renewalTime: c.renewalTime }));
+        return {
+          summary,
+          allHealthy: summary.notReady === 0 && summary.expiringSoon === 0,
+          warnings: { expiringSoon: expiringCerts, notReady: notReadyCerts },
+          nextToExpire,
+          note: OMITTED_NOTE,
+        };
+      }
+
       return {
         certificates: certs,
-        summary: {
-          total: certs.length,
-          ready: certs.filter((c) => c.ready).length,
-          expiringSoon: expiringCerts.length,
-          notReady: notReadyCerts.length,
-        },
+        summary,
         warnings: {
           expiringSoon: expiringCerts,
           notReady: notReadyCerts,

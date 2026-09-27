@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import * as radarr from '../clients/radarr.js';
 import { validationError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, summarizeQueue } from '../utils/summary.js';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -12,18 +13,16 @@ function formatBytes(bytes: number): string {
 
 const getRadarrQueue: Tool = {
   name: 'get_radarr_queue',
-  description: 'Get current download queue in Radarr showing what is downloading, stuck, or failed.',
+  description: 'Get current download queue in Radarr showing what is downloading, stuck, or failed. By default returns counts by state and identical items grouped (title, state, reason, count, queueIds).',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: { ...DETAIL_PARAM },
   },
-  handler: async () => {
+  handler: async (params) => {
     try {
       const queue = await radarr.getQueue();
 
-      return {
-        totalRecords: queue.totalRecords,
-        items: queue.records.map((item) => ({
+      const items = queue.records.map((item) => ({
           id: item.id,
           title: item.title,
           status: item.status,
@@ -36,8 +35,12 @@ const getRadarrQueue: Tool = {
           downloadClient: item.downloadClient,
           indexer: item.indexer,
           messages: item.statusMessages?.flatMap((m) => m.messages),
-        })),
-      };
+        }));
+
+      if (getDetail(params) === 'full') {
+        return { totalRecords: queue.totalRecords, items };
+      }
+      return { totalRecords: queue.totalRecords, ...summarizeQueue(items) };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Radarr error';
       return { error: true, code: 'RADARR_ERROR', message };

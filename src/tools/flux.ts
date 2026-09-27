@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
 import { k8sError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
 
 interface FluxResource {
   metadata: {
@@ -23,12 +24,12 @@ interface FluxListResponse {
 
 const getFluxStatus: Tool = {
   name: 'get_flux_status',
-  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing.',
+  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing. Returns ready/not-ready counts and only the not-Ready resources by default.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: { ...DETAIL_PARAM },
   },
-  handler: async () => {
+  handler: async (params) => {
     try {
       const api = getCustomObjectsApi();
 
@@ -51,9 +52,26 @@ const getFluxStatus: Tool = {
         };
       };
 
+      const ks = kustomizations.items.map(formatResource);
+      const hrs = helmReleases.items.map(formatResource);
+      const counts = (rs: Array<{ ready: boolean }>): { total: number; ready: number; notReady: number } => ({
+        total: rs.length,
+        ready: rs.filter((r) => r.ready).length,
+        notReady: rs.filter((r) => !r.ready).length,
+      });
+      const summary = { kustomizations: counts(ks), helmReleases: counts(hrs) };
+
+      if (getDetail(params) === 'full') {
+        return { summary, kustomizations: ks, helmReleases: hrs };
+      }
       return {
-        kustomizations: kustomizations.items.map(formatResource),
-        helmReleases: helmReleases.items.map(formatResource),
+        summary,
+        allReady: summary.kustomizations.notReady === 0 && summary.helmReleases.notReady === 0,
+        notReady: {
+          kustomizations: ks.filter((r) => !r.ready),
+          helmReleases: hrs.filter((r) => !r.ready),
+        },
+        note: OMITTED_NOTE,
       };
     } catch (error) {
       return k8sError(error);
