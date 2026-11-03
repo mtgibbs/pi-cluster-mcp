@@ -30,6 +30,7 @@ function sanitizeEnvFrom(envFrom: k8s.V1EnvFromSource[] | undefined): Array<{ ty
 
 const getBackupStatus: Tool = {
   name: 'get_backup_status',
+  readOnly: true,
   description: 'Get backup CronJob status including schedules, last run times, and a computed lastRunFailed verdict per job',
   inputSchema: {
     type: 'object',
@@ -84,6 +85,7 @@ const getBackupStatus: Tool = {
 
 const triggerBackup: Tool = {
   name: 'trigger_backup',
+  readOnly: false,
   description: 'Manually trigger a backup by creating a Job from a CronJob',
   inputSchema: {
     type: 'object',
@@ -136,6 +138,7 @@ const triggerBackup: Tool = {
 
 const getCronjobDetails: Tool = {
   name: 'get_cronjob_details',
+  readOnly: true,
   description: 'Get detailed information about a specific CronJob including schedule, job template, containers, volumes, and recent job history. Secret env values are redacted.',
   inputSchema: {
     type: 'object',
@@ -216,6 +219,7 @@ const getCronjobDetails: Tool = {
 
 const getJobLogs: Tool = {
   name: 'get_job_logs',
+  readOnly: true,
   description: 'Get logs from all pods belonging to a specific Job. Useful for checking backup job output or debugging failed jobs.',
   inputSchema: {
     type: 'object',

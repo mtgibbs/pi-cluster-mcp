@@ -36,6 +36,13 @@ spec:
                 secretKeyRef:
                   name: mcp-homelab-secrets
                   key: api-key
+            # Optional read-only key: lists/calls only `readOnly: true` tools
+            - name: MCP_READONLY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-homelab-readonly
+                  key: api-key
+                  optional: true
 
             # Synology NAS
             - name: NAS_PRIVATE_KEY

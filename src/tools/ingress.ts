@@ -5,6 +5,7 @@ import * as k8s from '@kubernetes/client-node';
 
 const getIngressStatus: Tool = {
   name: 'get_ingress_status',
+  readOnly: true,
   description: 'Get ingress status including hosts, TLS configuration, and backend health',
   inputSchema: {
     type: 'object',

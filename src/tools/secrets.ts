@@ -26,6 +26,7 @@ interface ExternalSecretList {
 
 const getSecretsStatus: Tool = {
   name: 'get_secrets_status',
+  readOnly: true,
   description: 'Get External Secrets sync status. Returns synced/failed counts and only the failing ExternalSecrets by default.',
   inputSchema: {
     type: 'object',
@@ -82,6 +83,7 @@ const getSecretsStatus: Tool = {
 
 const refreshSecret: Tool = {
   name: 'refresh_secret',
+  readOnly: false,
   description: 'Force an ExternalSecret to resync from the secret store',
   inputSchema: {
     type: 'object',

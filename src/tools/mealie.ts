@@ -92,6 +92,7 @@ function summarizeRecipe(r: mealie.RecipeSummary): RecipeSummaryOut {
 
 const getMealieStatus: Tool = {
   name: 'get_mealie_status',
+  readOnly: true,
   description:
     'Get Mealie recipe manager status: version, signup state, and library statistics (recipe/user/category/tag counts).',
   inputSchema: {
@@ -122,6 +123,7 @@ const getMealieStatus: Tool = {
 
 const searchMealieRecipes: Tool = {
   name: 'search_mealie_recipes',
+  readOnly: true,
   description:
     'Search recipes in Mealie by text (name, ingredients, description). Omit search to list the most recently added recipes.',
   inputSchema: {
@@ -154,6 +156,7 @@ const searchMealieRecipes: Tool = {
 
 const getMealieRecipe: Tool = {
   name: 'get_mealie_recipe',
+  readOnly: true,
   description:
     'Get a full recipe from Mealie by slug, including ingredients, instructions, times, and notes.',
   inputSchema: {
@@ -352,6 +355,7 @@ async function parseAndApplyIngredients(slug: string, parser: mealie.IngredientP
 
 const importMealieRecipeUrl: Tool = {
   name: 'import_mealie_recipe_url',
+  readOnly: false,
   description:
     'Import a recipe into Mealie from a URL (the recipe-scrapers/schema.org path — no AI required). By default the imported ingredient lines are then parsed into structured quantity/unit/food (enables scaling + shopping lists). Returns the created recipe slug plus the parse outcome. Fails cleanly on sites without structured recipe data.',
   inputSchema: {
@@ -420,6 +424,7 @@ const importMealieRecipeUrl: Tool = {
 
 const parseMealieRecipeIngredients: Tool = {
   name: 'parse_mealie_recipe_ingredients',
+  readOnly: false,
   description:
     'Parse an unstructured Mealie recipe’s ingredient lines into structured quantity/unit/food and save them back (enables scaling and shopping-list merging). Only targets recipes that have never been parsed (machine imports); recipes with structured ingredients are refused to protect hand-curated data.',
   inputSchema: {

@@ -1,3 +1,4 @@
+import type { AuthScope } from '../auth.js';
 import { clusterTools } from './cluster.js';
 import { dnsTools } from './dns.js';
 import { fluxTools } from './flux.js';
@@ -20,6 +21,9 @@ import { mealieTools } from './mealie.js';
 
 export interface Tool {
   name: string;
+  // true only if the tool changes nothing (cluster, NAS, apps, or third-party indexers). Required
+  // so a new tool can't silently land in the read-only key's scope.
+  readOnly: boolean;
   description: string;
   inputSchema: {
     type: 'object';
@@ -53,13 +57,19 @@ export const tools: Tool[] = [
 
 const toolMap = new Map(tools.map((t) => [t.name, t]));
 
+export function toolsForScope(scope: AuthScope): Tool[] {
+  return scope === 'full' ? tools : tools.filter((t) => t.readOnly);
+}
+
 export async function handleToolCall(
   name: string,
-  args: Record<string, unknown> | undefined
+  args: Record<string, unknown> | undefined,
+  scope: AuthScope = 'full'
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
   const tool = toolMap.get(name);
 
-  if (!tool) {
+  // Same answer as a nonexistent tool, so the read-only key can't probe for write tools.
+  if (!tool || (scope === 'readonly' && !tool.readOnly)) {
     return {
       content: [
         {

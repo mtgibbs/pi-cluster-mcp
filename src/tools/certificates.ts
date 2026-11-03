@@ -31,6 +31,7 @@ interface CertificateList {
 
 const getCertificateStatus: Tool = {
   name: 'get_certificate_status',
+  readOnly: true,
   description: 'Get TLS certificate status from cert-manager including expiry and pending challenges. Returns counts, not-Ready/expiring (<30d) certs and the next three to expire by default.',
   inputSchema: {
     type: 'object',

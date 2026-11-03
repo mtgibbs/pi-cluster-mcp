@@ -24,6 +24,7 @@ interface FluxListResponse {
 
 const getFluxStatus: Tool = {
   name: 'get_flux_status',
+  readOnly: true,
   description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing. Returns ready/not-ready counts and only the not-Ready resources by default.',
   inputSchema: {
     type: 'object',
@@ -81,6 +82,7 @@ const getFluxStatus: Tool = {
 
 const reconcileFlux: Tool = {
   name: 'reconcile_flux',
+  readOnly: false,
   description: 'Trigger Flux reconciliation for a specific resource or all resources. Use this to force an immediate sync of GitOps resources.',
   inputSchema: {
     type: 'object',

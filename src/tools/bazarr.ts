@@ -4,6 +4,7 @@ import { validationError } from '../utils/errors.js';
 
 const getSubtitleStatus: Tool = {
   name: 'get_subtitle_status',
+  readOnly: true,
   description: 'Get wanted/missing subtitle counts for series and movies. Shows which episodes and movies still need subtitles.',
   inputSchema: {
     type: 'object',
@@ -40,6 +41,7 @@ const getSubtitleStatus: Tool = {
 
 const getSubtitleHistory: Tool = {
   name: 'get_subtitle_history',
+  readOnly: true,
   description: 'Get recent subtitle download history showing what was found, which provider, and what language.',
   inputSchema: {
     type: 'object',
@@ -73,6 +75,7 @@ const getSubtitleHistory: Tool = {
 
 const searchSubtitles: Tool = {
   name: 'search_subtitles',
+  readOnly: false,
   description: 'Trigger a manual subtitle search for a specific episode or movie. Use get_subtitle_status first to find the IDs.',
   inputSchema: {
     type: 'object',

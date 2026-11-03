@@ -5,6 +5,7 @@ import { validationError } from '../utils/errors.js';
 
 const getQualityProfile: Tool = {
   name: 'get_quality_profile',
+  readOnly: true,
   description: 'View quality profiles in Sonarr or Radarr to understand what quality levels are being targeted.',
   inputSchema: {
     type: 'object',
@@ -45,6 +46,7 @@ const getQualityProfile: Tool = {
 
 const rejectAndSearch: Tool = {
   name: 'reject_and_search',
+  readOnly: false,
   description: 'Reject a queued item in Sonarr or Radarr (optionally blocklisting it) and trigger a new search. Useful when wrong quality or release was grabbed.',
   inputSchema: {
     type: 'object',

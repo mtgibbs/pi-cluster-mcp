@@ -4,6 +4,7 @@ import { validationError } from '../utils/errors.js';
 
 const getSabnzbdQueue: Tool = {
   name: 'get_sabnzbd_queue',
+  readOnly: true,
   description: 'Get active download queue from SABnzbd showing item name, status, speed, ETA, category (books/tv/movies), size, and priority.',
   inputSchema: {
     type: 'object',
@@ -48,6 +49,7 @@ const getSabnzbdQueue: Tool = {
 
 const getSabnzbdHistory: Tool = {
   name: 'get_sabnzbd_history',
+  readOnly: true,
   description: 'Get completed and failed download history from SABnzbd. Shows category, final size, status, and failure reason if applicable.',
   inputSchema: {
     type: 'object',
@@ -87,6 +89,7 @@ const getSabnzbdHistory: Tool = {
 
 const retrySabnzbdDownload: Tool = {
   name: 'retry_sabnzbd_download',
+  readOnly: false,
   description: 'Retry a failed download from SABnzbd history by its NZO ID.',
   inputSchema: {
     type: 'object',
@@ -118,6 +121,7 @@ const retrySabnzbdDownload: Tool = {
 
 const pauseResumeSabnzbd: Tool = {
   name: 'pause_resume_sabnzbd',
+  readOnly: false,
   description: 'Pause or resume the SABnzbd download queue. Can target the entire queue or a specific item.',
   inputSchema: {
     type: 'object',

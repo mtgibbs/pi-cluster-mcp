@@ -8,6 +8,7 @@ import * as k8s from '@kubernetes/client-node';
 
 const getMediaStatus: Tool = {
   name: 'get_media_status',
+  readOnly: true,
   description: 'Get media services health (Jellyfin, Immich) including library stats and active sessions. Check this if media services are down.',
   inputSchema: {
     type: 'object',
@@ -99,6 +100,7 @@ const getMediaStatus: Tool = {
 
 const fixJellyfinMetadata: Tool = {
   name: 'fix_jellyfin_metadata',
+  readOnly: false,
   description: 'Search for a media item in Jellyfin and trigger a metadata refresh. Use this when media items have incorrect or missing info.',
   inputSchema: {
     type: 'object',
@@ -183,6 +185,7 @@ const fixJellyfinMetadata: Tool = {
 
 const touchNasPath: Tool = {
   name: 'touch_nas_path',
+  readOnly: false,
   description: `SSH to Synology NAS and touch a path to update timestamps. Restricted to: ${getAllowedPaths().join(', ')}`,
   inputSchema: {
     type: 'object',

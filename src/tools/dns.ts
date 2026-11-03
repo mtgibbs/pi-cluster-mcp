@@ -9,6 +9,7 @@ const PIHOLE_CONTAINER = 'pihole';
 
 const getDnsStatus: Tool = {
   name: 'get_dns_status',
+  readOnly: true,
   description: 'Get Pi-hole and Unbound DNS service health including query statistics',
   inputSchema: {
     type: 'object',
@@ -108,6 +109,7 @@ const getDnsStatus: Tool = {
 
 const testDnsQuery: Tool = {
   name: 'test_dns_query',
+  readOnly: true,
   description: 'Test DNS resolution by running dig against Pi-hole. Verify if internal/external DNS resolution is working from within the cluster.',
   inputSchema: {
     type: 'object',
@@ -175,6 +177,7 @@ const testDnsQuery: Tool = {
 
 const updatePiholeGravity: Tool = {
   name: 'update_pihole_gravity',
+  readOnly: false,
   description: 'Trigger a Pi-hole gravity update to re-download blocklists and rebuild the database',
   inputSchema: {
     type: 'object',
@@ -200,6 +203,7 @@ const updatePiholeGravity: Tool = {
 
 const getPiholeWhitelist: Tool = {
   name: 'get_pihole_whitelist',
+  readOnly: true,
   description: 'List all whitelisted domains in Pi-hole',
   inputSchema: {
     type: 'object',
@@ -230,6 +234,7 @@ const getPiholeWhitelist: Tool = {
 
 const getPiholeQueries: Tool = {
   name: 'get_pihole_queries',
+  readOnly: true,
   description: 'Get recent DNS queries from Pi-hole query log',
   inputSchema: {
     type: 'object',
@@ -264,6 +269,7 @@ const getPiholeQueries: Tool = {
 
 const diagnoseDns: Tool = {
   name: 'diagnose_dns',
+  readOnly: true,
   description:
     'Run a full DNS diagnostic for a domain, testing the complete resolution path: Pi-hole cache, Unbound primary, Unbound secondary, and checking for DNSSEC issues. Use this FIRST when a user reports a domain is unreachable.',
   inputSchema: {
