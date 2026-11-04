@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError, notAllowedError } from '../utils/errors.js';
+import { validationError, k8sError, notAllowedError, alreadyRunningError } from '../utils/errors.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
@@ -116,6 +116,31 @@ const triggerBackup: Tool = {
       const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
       const cronjob = cronjobResp.body;
 
+      // Refuse to overlap a run already in progress: a manual Job bypasses the CronJob's
+      // concurrencyPolicy, and two rsync --delete runs against one target can lose data.
+      // Counts scheduled runs (status.active) and earlier manual Jobs (cronjob-name label).
+      const scheduledActive = cronjob.status?.active?.length ?? 0;
+      const manualJobs = await batchApi.listNamespacedJob(
+        namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        `cronjob-name=${cronjobName}`
+      );
+      const manualActive = manualJobs.body.items.filter((j) => (j.status?.active ?? 0) > 0).length;
+      if (scheduledActive + manualActive > 0) {
+        return alreadyRunningError(
+          `A run of ${namespace}/${cronjobName} is already active ` +
+            `(${scheduledActive} scheduled, ${manualActive} manual). Refusing to start an overlapping run.`
+        );
+      }
+
+      const jobSpec = cronjob.spec?.jobTemplate?.spec;
+      if (!jobSpec) {
+        return validationError(`CronJob ${namespace}/${cronjobName} has no jobTemplate.spec`);
+      }
+
       const jobName = `${cronjobName}-manual-${Date.now()}`;
 
       const job: k8s.V1Job = {
@@ -129,7 +154,7 @@ const triggerBackup: Tool = {
             'cronjob-name': cronjobName,
           },
         },
-        spec: cronjob.spec?.jobTemplate?.spec,
+        spec: jobSpec,
       };
 
       await batchApi.createNamespacedJob(namespace, job);
