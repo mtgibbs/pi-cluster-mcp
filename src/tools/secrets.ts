@@ -1,7 +1,10 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
-import { k8sError } from '../utils/errors.js';
+import { k8sError, validationError, notAllowedError } from '../utils/errors.js';
+import { FLUX_MANAGED_LABEL } from './flux.js';
 import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
+
+const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
 interface ExternalSecret {
   metadata: {
@@ -26,6 +29,7 @@ interface ExternalSecretList {
 
 const getSecretsStatus: Tool = {
   name: 'get_secrets_status',
+  readOnly: true,
   description: 'Get External Secrets sync status. Returns synced/failed counts and only the failing ExternalSecrets by default.',
   inputSchema: {
     type: 'object',
@@ -82,6 +86,7 @@ const getSecretsStatus: Tool = {
 
 const refreshSecret: Tool = {
   name: 'refresh_secret',
+  readOnly: false,
   description: 'Force an ExternalSecret to resync from the secret store',
   inputSchema: {
     type: 'object',
@@ -95,9 +100,20 @@ const refreshSecret: Tool = {
     const namespace = params.namespace as string;
     const name = params.name as string;
 
+    if (!DNS_1123_RE.test(namespace ?? '') || !DNS_1123_RE.test(name ?? '')) {
+      return validationError('namespace and name must be DNS-1123 names (lowercase alphanumeric and hyphens).');
+    }
+
     try {
       const api = getCustomObjectsApi();
       const now = new Date().toISOString();
+
+      // Scope gate: only ExternalSecrets applied by Flux (GitOps-managed), same rule as reconcile_flux.
+      const es = (await api.getNamespacedCustomObject('external-secrets.io', 'v1', namespace, 'externalsecrets', name))
+        .body as { metadata?: { labels?: Record<string, string> } };
+      if (!es.metadata?.labels?.[FLUX_MANAGED_LABEL]) {
+        return notAllowedError(`Refreshing ExternalSecret ${namespace}/${name}, which is not applied by a Flux Kustomization,`);
+      }
 
       const patch = {
         metadata: {

@@ -1,9 +1,13 @@
 import type { Tool } from './index.js';
 import * as sabnzbd from '../clients/sabnzbd.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
+
+const NZO_ID_RE = /^SABnzbd_nzo_[A-Za-z0-9_-]{1,64}$/;
 
 const getSabnzbdQueue: Tool = {
   name: 'get_sabnzbd_queue',
+  readOnly: true,
   description: 'Get active download queue from SABnzbd showing item name, status, speed, ETA, category (books/tv/movies), size, and priority.',
   inputSchema: {
     type: 'object',
@@ -48,6 +52,7 @@ const getSabnzbdQueue: Tool = {
 
 const getSabnzbdHistory: Tool = {
   name: 'get_sabnzbd_history',
+  readOnly: true,
   description: 'Get completed and failed download history from SABnzbd. Shows category, final size, status, and failure reason if applicable.',
   inputSchema: {
     type: 'object',
@@ -87,6 +92,7 @@ const getSabnzbdHistory: Tool = {
 
 const retrySabnzbdDownload: Tool = {
   name: 'retry_sabnzbd_download',
+  readOnly: false,
   description: 'Retry a failed download from SABnzbd history by its NZO ID.',
   inputSchema: {
     type: 'object',
@@ -98,9 +104,12 @@ const retrySabnzbdDownload: Tool = {
   handler: async (params) => {
     const nzoId = params.nzoId as string;
 
-    if (!nzoId || typeof nzoId !== 'string') {
-      return validationError('nzoId must be a non-empty string');
+    if (typeof nzoId !== 'string' || !NZO_ID_RE.test(nzoId)) {
+      return validationError('nzoId must be a SABnzbd id (SABnzbd_nzo_…)');
     }
+
+    const limited = gates.retry_sabnzbd_download.check(nzoId);
+    if (limited) return limited;
 
     try {
       await sabnzbd.retryDownload(nzoId);
@@ -118,6 +127,7 @@ const retrySabnzbdDownload: Tool = {
 
 const pauseResumeSabnzbd: Tool = {
   name: 'pause_resume_sabnzbd',
+  readOnly: false,
   description: 'Pause or resume the SABnzbd download queue. Can target the entire queue or a specific item.',
   inputSchema: {
     type: 'object',
@@ -134,6 +144,12 @@ const pauseResumeSabnzbd: Tool = {
     if (!['pause', 'resume'].includes(action)) {
       return validationError('action must be "pause" or "resume"');
     }
+    if (nzoId !== undefined && (typeof nzoId !== 'string' || !NZO_ID_RE.test(nzoId))) {
+      return validationError('nzoId must be a SABnzbd id (SABnzbd_nzo_…)');
+    }
+
+    const limited = gates.pause_resume_sabnzbd.check(nzoId ?? 'queue');
+    if (limited) return limited;
 
     try {
       if (nzoId) {

@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as sonarr from '../clients/sonarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, summarizeQueue } from '../utils/summary.js';
 
@@ -13,6 +14,7 @@ function formatBytes(bytes: number): string {
 
 const getSonarrQueue: Tool = {
   name: 'get_sonarr_queue',
+  readOnly: true,
   description: 'Get current download queue in Sonarr showing what is downloading, stuck, or failed. By default returns counts by state and identical items grouped (title, state, reason, count, queueIds).',
   inputSchema: {
     type: 'object',
@@ -50,6 +52,7 @@ const getSonarrQueue: Tool = {
 
 const getSonarrHistory: Tool = {
   name: 'get_sonarr_history',
+  readOnly: true,
   description: 'Get recent grab/download/import history for TV series in Sonarr.',
   inputSchema: {
     type: 'object',
@@ -86,6 +89,7 @@ const getSonarrHistory: Tool = {
 
 const searchSonarrEpisode: Tool = {
   name: 'search_sonarr_episode',
+  readOnly: false,
   description: 'Trigger a manual interactive search for an episode in Sonarr. Returns available releases with quality, size, and indexer info. Useful when auto-grab picked wrong quality.',
   inputSchema: {
     type: 'object',
@@ -100,6 +104,9 @@ const searchSonarrEpisode: Tool = {
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
       return validationError('episodeId must be a positive integer');
     }
+
+    const limited = gates.search_sonarr_episode.check(`episode ${episodeId}`);
+    if (limited) return limited;
 
     try {
       const releases = await sonarr.searchEpisode(episodeId);

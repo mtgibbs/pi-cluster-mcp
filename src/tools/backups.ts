@@ -1,9 +1,12 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError } from '../utils/errors.js';
+import { validationError, k8sError, notAllowedError, alreadyRunningError } from '../utils/errors.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
+// trigger_backup only runs CronJobs here. Running an arbitrary CronJob is a separate, label-gated tool.
+export const BACKUP_NAMESPACE = 'backup-jobs';
 
 function sanitizeEnvVars(envVars: k8s.V1EnvVar[] | undefined): Array<{ name: string; value: string }> {
   if (!envVars) return [];
@@ -30,6 +33,7 @@ function sanitizeEnvFrom(envFrom: k8s.V1EnvFromSource[] | undefined): Array<{ ty
 
 const getBackupStatus: Tool = {
   name: 'get_backup_status',
+  readOnly: true,
   description: 'Get backup CronJob status including schedules, last run times, and a computed lastRunFailed verdict per job',
   inputSchema: {
     type: 'object',
@@ -84,7 +88,8 @@ const getBackupStatus: Tool = {
 
 const triggerBackup: Tool = {
   name: 'trigger_backup',
-  description: 'Manually trigger a backup by creating a Job from a CronJob',
+  readOnly: false,
+  description: 'Manually trigger a backup by creating a Job from a CronJob in the backup-jobs namespace',
   inputSchema: {
     type: 'object',
     properties: {
@@ -97,12 +102,44 @@ const triggerBackup: Tool = {
     const namespace = params.namespace as string;
     const cronjobName = params.cronjob as string;
 
+    if (namespace !== BACKUP_NAMESPACE) {
+      return notAllowedError(`Triggering CronJobs outside the ${BACKUP_NAMESPACE} namespace`);
+    }
+    if (!DNS_1123_RE.test(cronjobName ?? '')) {
+      return validationError('cronjob must be a DNS-1123 name (lowercase alphanumeric and hyphens).');
+    }
+
     try {
       const kc = getKubeConfig();
       const batchApi = kc.makeApiClient(k8s.BatchV1Api);
 
       const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
       const cronjob = cronjobResp.body;
+
+      // Refuse to overlap a run already in progress: a manual Job bypasses the CronJob's
+      // concurrencyPolicy, and two rsync --delete runs against one target can lose data.
+      // Counts scheduled runs (status.active) and earlier manual Jobs (cronjob-name label).
+      const scheduledActive = cronjob.status?.active?.length ?? 0;
+      const manualJobs = await batchApi.listNamespacedJob(
+        namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        `cronjob-name=${cronjobName}`
+      );
+      const manualActive = manualJobs.body.items.filter((j) => (j.status?.active ?? 0) > 0).length;
+      if (scheduledActive + manualActive > 0) {
+        return alreadyRunningError(
+          `A run of ${namespace}/${cronjobName} is already active ` +
+            `(${scheduledActive} scheduled, ${manualActive} manual). Refusing to start an overlapping run.`
+        );
+      }
+
+      const jobSpec = cronjob.spec?.jobTemplate?.spec;
+      if (!jobSpec) {
+        return validationError(`CronJob ${namespace}/${cronjobName} has no jobTemplate.spec`);
+      }
 
       const jobName = `${cronjobName}-manual-${Date.now()}`;
 
@@ -117,7 +154,7 @@ const triggerBackup: Tool = {
             'cronjob-name': cronjobName,
           },
         },
-        spec: cronjob.spec?.jobTemplate?.spec,
+        spec: jobSpec,
       };
 
       await batchApi.createNamespacedJob(namespace, job);
@@ -136,6 +173,7 @@ const triggerBackup: Tool = {
 
 const getCronjobDetails: Tool = {
   name: 'get_cronjob_details',
+  readOnly: true,
   description: 'Get detailed information about a specific CronJob including schedule, job template, containers, volumes, and recent job history. Secret env values are redacted.',
   inputSchema: {
     type: 'object',
@@ -216,6 +254,7 @@ const getCronjobDetails: Tool = {
 
 const getJobLogs: Tool = {
   name: 'get_job_logs',
+  readOnly: true,
   description: 'Get logs from all pods belonging to a specific Job. Useful for checking backup job output or debugging failed jobs.',
   inputSchema: {
     type: 'object',

@@ -1,7 +1,7 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod, readPodLog } from '../clients/kubernetes.js';
 import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
-import { k8sError, notFoundError } from '../utils/errors.js';
+import { k8sError, notFoundError, rateLimitedError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
 const PIHOLE_LABEL = 'app=pihole';
@@ -9,6 +9,7 @@ const PIHOLE_CONTAINER = 'pihole';
 
 const getDnsStatus: Tool = {
   name: 'get_dns_status',
+  readOnly: true,
   description: 'Get Pi-hole and Unbound DNS service health including query statistics',
   inputSchema: {
     type: 'object',
@@ -108,6 +109,7 @@ const getDnsStatus: Tool = {
 
 const testDnsQuery: Tool = {
   name: 'test_dns_query',
+  readOnly: true,
   description: 'Test DNS resolution by running dig against Pi-hole. Verify if internal/external DNS resolution is working from within the cluster.',
   inputSchema: {
     type: 'object',
@@ -173,14 +175,32 @@ const testDnsQuery: Tool = {
   },
 };
 
+export const GRAVITY_COOLDOWN_MS = 5 * 60 * 1000;
+let lastGravityRun = 0;
+let gravityInFlight = false;
+
 const updatePiholeGravity: Tool = {
   name: 'update_pihole_gravity',
-  description: 'Trigger a Pi-hole gravity update to re-download blocklists and rebuild the database',
+  readOnly: false,
+  description: 'Trigger a Pi-hole gravity update to re-download blocklists and rebuild the database. At most once per 5 minutes.',
   inputSchema: {
     type: 'object',
     properties: {},
   },
   handler: async () => {
+    // Rate gate: a gravity run re-downloads every blocklist and rebuilds the DB, and Pi-hole
+    // serves degraded while it runs. Refuse repeats inside the cooldown, and overlapping calls.
+    const now = Date.now();
+    if (gravityInFlight || now - lastGravityRun < GRAVITY_COOLDOWN_MS) {
+      const waitS = Math.ceil((GRAVITY_COOLDOWN_MS - (now - lastGravityRun)) / 1000);
+      return rateLimitedError(
+        gravityInFlight
+          ? 'A gravity update is already in progress'
+          : `Gravity was updated recently; try again in ${waitS}s`
+      );
+    }
+    gravityInFlight = true;
+    lastGravityRun = now;
     try {
       const output = await updateGravity();
       return {
@@ -194,12 +214,15 @@ const updatePiholeGravity: Tool = {
         code: 'PIHOLE_ERROR',
         message: error instanceof Error ? error.message : 'Failed to update gravity',
       };
+    } finally {
+      gravityInFlight = false;
     }
   },
 };
 
 const getPiholeWhitelist: Tool = {
   name: 'get_pihole_whitelist',
+  readOnly: true,
   description: 'List all whitelisted domains in Pi-hole',
   inputSchema: {
     type: 'object',
@@ -230,6 +253,7 @@ const getPiholeWhitelist: Tool = {
 
 const getPiholeQueries: Tool = {
   name: 'get_pihole_queries',
+  readOnly: true,
   description: 'Get recent DNS queries from Pi-hole query log',
   inputSchema: {
     type: 'object',
@@ -264,6 +288,7 @@ const getPiholeQueries: Tool = {
 
 const diagnoseDns: Tool = {
   name: 'diagnose_dns',
+  readOnly: true,
   description:
     'Run a full DNS diagnostic for a domain, testing the complete resolution path: Pi-hole cache, Unbound primary, Unbound secondary, and checking for DNSSEC issues. Use this FIRST when a user reports a domain is unreachable.',
   inputSchema: {

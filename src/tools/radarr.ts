@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as radarr from '../clients/radarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, summarizeQueue } from '../utils/summary.js';
 
@@ -13,6 +14,7 @@ function formatBytes(bytes: number): string {
 
 const getRadarrQueue: Tool = {
   name: 'get_radarr_queue',
+  readOnly: true,
   description: 'Get current download queue in Radarr showing what is downloading, stuck, or failed. By default returns counts by state and identical items grouped (title, state, reason, count, queueIds).',
   inputSchema: {
     type: 'object',
@@ -50,6 +52,7 @@ const getRadarrQueue: Tool = {
 
 const getRadarrHistory: Tool = {
   name: 'get_radarr_history',
+  readOnly: true,
   description: 'Get recent grab/download/import history for movies in Radarr.',
   inputSchema: {
     type: 'object',
@@ -85,6 +88,7 @@ const getRadarrHistory: Tool = {
 
 const searchRadarrMovie: Tool = {
   name: 'search_radarr_movie',
+  readOnly: false,
   description: 'Trigger a manual interactive search for a movie in Radarr. Returns available releases with quality, size, and indexer info.',
   inputSchema: {
     type: 'object',
@@ -99,6 +103,9 @@ const searchRadarrMovie: Tool = {
     if (!Number.isInteger(movieId) || movieId <= 0) {
       return validationError('movieId must be a positive integer');
     }
+
+    const limited = gates.search_radarr_movie.check(`movie ${movieId}`);
+    if (limited) return limited;
 
     try {
       const releases = await radarr.searchMovie(movieId);

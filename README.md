@@ -57,7 +57,8 @@ This project is built with a "defense in depth" approach:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `MCP_API_KEY` | Secret key for authenticating requests | Yes |
+| `MCP_API_KEY` | Secret key for authenticating requests (all tools) | Yes |
+| `MCP_READONLY_API_KEY` | Second key that only sees and calls tools marked `readOnly: true` (safe for unattended agents). Must differ from `MCP_API_KEY` | No |
 | `MCP_TRANSPORT` | `stdio` (default) or `sse` | No |
 | `NAS_HOST` | Hostname/IP of Synology NAS | Yes (for NAS tools) |
 | `NAS_USER` | SSH Username for NAS | Yes (for NAS tools) |

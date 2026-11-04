@@ -7,6 +7,7 @@ const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
 const getPvcs: Tool = {
   name: 'get_pvcs',
+  readOnly: true,
   description: 'List PersistentVolumeClaims with status, capacity, storage class, and bound volume info. Useful for diagnosing storage issues like pending or lost PVCs. Returns counts, any PVC not Bound, and the ten largest by capacity by default.',
   inputSchema: {
     type: 'object',

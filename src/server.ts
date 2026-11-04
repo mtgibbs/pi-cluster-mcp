@@ -3,9 +3,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { tools, handleToolCall } from './tools/index.js';
+import { toolsForScope, handleToolCall } from './tools/index.js';
+import type { AuthScope } from './auth.js';
 
-export function createServer(): Server {
+export function createServer(scope: AuthScope = 'full'): Server {
   const server = new Server(
     {
       name: 'homelab-mcp',
@@ -20,17 +21,18 @@ export function createServer(): Server {
 
   server.setRequestHandler(ListToolsRequestSchema, () => {
     return {
-      tools: tools.map((tool) => ({
+      tools: toolsForScope(scope).map((tool) => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: { readOnlyHint: tool.readOnly },
       })),
     };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    return handleToolCall(name, args);
+    return handleToolCall(name, args, scope);
   });
 
   return server;

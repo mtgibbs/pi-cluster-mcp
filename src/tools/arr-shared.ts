@@ -1,10 +1,12 @@
 import type { Tool } from './index.js';
 import * as sonarr from '../clients/sonarr.js';
 import * as radarr from '../clients/radarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 
 const getQualityProfile: Tool = {
   name: 'get_quality_profile',
+  readOnly: true,
   description: 'View quality profiles in Sonarr or Radarr to understand what quality levels are being targeted.',
   inputSchema: {
     type: 'object',
@@ -45,6 +47,7 @@ const getQualityProfile: Tool = {
 
 const rejectAndSearch: Tool = {
   name: 'reject_and_search',
+  readOnly: false,
   description: 'Reject a queued item in Sonarr or Radarr (optionally blocklisting it) and trigger a new search. Useful when wrong quality or release was grabbed.',
   inputSchema: {
     type: 'object',
@@ -68,6 +71,9 @@ const rejectAndSearch: Tool = {
     if (!Number.isInteger(queueId) || queueId <= 0) {
       return validationError('queueId must be a positive integer');
     }
+
+    const limited = gates.reject_and_search.check(`${service} queue item ${queueId}`);
+    if (limited) return limited;
 
     try {
       // First, get the queue item details so we can search again

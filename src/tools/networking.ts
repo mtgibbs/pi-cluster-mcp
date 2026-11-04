@@ -8,6 +8,7 @@ const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
 const getNodeNetworking: Tool = {
   name: 'get_node_networking',
+  readOnly: true,
   description: 'Get network interfaces, addresses, routes, and routing rules for a cluster node. Deep dive into node network config.',
   inputSchema: {
     type: 'object',
@@ -67,6 +68,7 @@ const CHAIN_RE = /^[A-Z][A-Z0-9_-]*$/;
 
 const getIptablesRules: Tool = {
   name: 'get_iptables_rules',
+  readOnly: true,
   description: 'Get iptables rules for a specific table on a cluster node. Use to debug firewall/routing issues.',
   inputSchema: {
     type: 'object',
@@ -127,6 +129,7 @@ const CONNTRACK_FILTER_RE = /^[a-zA-Z0-9.:/]+$/;
 
 const getConntrackEntries: Tool = {
   name: 'get_conntrack_entries',
+  readOnly: true,
   description: 'Get connection tracking entries from a cluster node. Use to debug connection tracking issues.',
   inputSchema: {
     type: 'object',
@@ -185,6 +188,7 @@ const getConntrackEntries: Tool = {
 
 const curlIngress: Tool = {
   name: 'curl_ingress',
+  readOnly: true,
   description: 'Test HTTP(S) connectivity to an ingress URL from within the cluster',
   inputSchema: {
     type: 'object',
@@ -295,6 +299,7 @@ const HOSTNAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/;
 
 const testPodConnectivity: Tool = {
   name: 'test_pod_connectivity',
+  readOnly: true,
   description: 'Test network connectivity from a cluster node to a target using ping and optional port check. Verify if a node can reach a specific target IP/Port.',
   inputSchema: {
     type: 'object',
