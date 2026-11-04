@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as radarr from '../clients/radarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, summarizeQueue } from '../utils/summary.js';
 
@@ -102,6 +103,9 @@ const searchRadarrMovie: Tool = {
     if (!Number.isInteger(movieId) || movieId <= 0) {
       return validationError('movieId must be a positive integer');
     }
+
+    const limited = gates.search_radarr_movie.check(`movie ${movieId}`);
+    if (limited) return limited;
 
     try {
       const releases = await radarr.searchMovie(movieId);

@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as sonarr from '../clients/sonarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, summarizeQueue } from '../utils/summary.js';
 
@@ -103,6 +104,9 @@ const searchSonarrEpisode: Tool = {
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
       return validationError('episodeId must be a positive integer');
     }
+
+    const limited = gates.search_sonarr_episode.check(`episode ${episodeId}`);
+    if (limited) return limited;
 
     try {
       const releases = await sonarr.searchEpisode(episodeId);

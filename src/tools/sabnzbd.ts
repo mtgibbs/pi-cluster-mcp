@@ -1,6 +1,9 @@
 import type { Tool } from './index.js';
 import * as sabnzbd from '../clients/sabnzbd.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
+
+const NZO_ID_RE = /^SABnzbd_nzo_[A-Za-z0-9_-]{1,64}$/;
 
 const getSabnzbdQueue: Tool = {
   name: 'get_sabnzbd_queue',
@@ -101,9 +104,12 @@ const retrySabnzbdDownload: Tool = {
   handler: async (params) => {
     const nzoId = params.nzoId as string;
 
-    if (!nzoId || typeof nzoId !== 'string') {
-      return validationError('nzoId must be a non-empty string');
+    if (typeof nzoId !== 'string' || !NZO_ID_RE.test(nzoId)) {
+      return validationError('nzoId must be a SABnzbd id (SABnzbd_nzo_…)');
     }
+
+    const limited = gates.retry_sabnzbd_download.check(nzoId);
+    if (limited) return limited;
 
     try {
       await sabnzbd.retryDownload(nzoId);
@@ -138,6 +144,12 @@ const pauseResumeSabnzbd: Tool = {
     if (!['pause', 'resume'].includes(action)) {
       return validationError('action must be "pause" or "resume"');
     }
+    if (nzoId !== undefined && (typeof nzoId !== 'string' || !NZO_ID_RE.test(nzoId))) {
+      return validationError('nzoId must be a SABnzbd id (SABnzbd_nzo_…)');
+    }
+
+    const limited = gates.pause_resume_sabnzbd.check(nzoId ?? 'queue');
+    if (limited) return limited;
 
     try {
       if (nzoId) {

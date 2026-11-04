@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as mealie from '../clients/mealie.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError, type ToolError } from '../utils/errors.js';
 
 const PRIVATE_IPV4 =
@@ -394,6 +395,9 @@ const importMealieRecipeUrl: Tool = {
     const shouldParse = params.parseIngredients !== false;
 
     const importKey = url.toString();
+
+    const limited = gates.import_mealie_recipe_url.check(importKey);
+    if (limited) return limited;
     if (!beginImport(importKey)) {
       return {
         error: true,
@@ -449,6 +453,9 @@ const parseMealieRecipeIngredients: Tool = {
     if (typeof parser !== 'string') {
       return parser;
     }
+
+    const limited = gates.parse_mealie_recipe_ingredients.check(slug);
+    if (limited) return limited;
 
     const outcome = await parseAndApplyIngredients(slug, parser);
     return { slug, url: mealie.recipeUrl(slug), ...outcome };

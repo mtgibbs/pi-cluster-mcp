@@ -1,5 +1,6 @@
 import type { Tool } from './index.js';
 import * as bazarr from '../clients/bazarr.js';
+import { gates } from '../utils/rate-gate.js';
 import { validationError } from '../utils/errors.js';
 
 const getSubtitleStatus: Tool = {
@@ -95,6 +96,9 @@ const searchSubtitles: Tool = {
     if (!Number.isInteger(id) || id <= 0) {
       return validationError('ID must be a positive integer');
     }
+
+    const limited = gates.search_subtitles.check(`${type} ${id}`);
+    if (limited) return limited;
 
     try {
       const result = await bazarr.searchSubtitles(type, id);
