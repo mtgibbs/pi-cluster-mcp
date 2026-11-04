@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.2.0...homelab-mcp-v0.2.1) (2026-11-04)
+
+
+### Features
+
+* **auth:** optional read-only API key scoped to read-only tools ([#57](https://github.com/mtgibbs/pi-cluster-mcp/issues/57)) ([23bab4d](https://github.com/mtgibbs/pi-cluster-mcp/commit/23bab4dec78e51dd877bc8bb37d31cff2ca6ab0b))
+
 ## [0.2.0](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.26...homelab-mcp-v0.2.0) (2026-09-27)
 
 
