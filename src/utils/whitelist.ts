@@ -52,12 +52,3 @@ export function isDeploymentAllowed(namespace: string, name: string): boolean {
 export function getAllowedDeployments(): string[] {
   return Array.from(ALLOWED_DEPLOYMENTS);
 }
-
-// Opt-in label a CronJob must carry before trigger_backup will run it. Adding it is the manifest
-// author's attestation that the job is idempotent and safe to run on demand, since a manual run
-// bypasses the CronJob's concurrencyPolicy.
-export const TRIGGERABLE_LABEL = 'homelab.mcp/triggerable';
-
-export function isCronjobTriggerable(labels: Record<string, string> | undefined): boolean {
-  return labels?.[TRIGGERABLE_LABEL] === 'true';
-}

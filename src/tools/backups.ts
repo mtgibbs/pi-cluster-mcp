@@ -1,10 +1,12 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError, notTriggerableError } from '../utils/errors.js';
-import { isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
+import { validationError, k8sError, notAllowedError } from '../utils/errors.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
+// trigger_backup only runs CronJobs here. Running an arbitrary CronJob is a separate, label-gated tool.
+export const BACKUP_NAMESPACE = 'backup-jobs';
 
 function sanitizeEnvVars(envVars: k8s.V1EnvVar[] | undefined): Array<{ name: string; value: string }> {
   if (!envVars) return [];
@@ -87,7 +89,7 @@ const getBackupStatus: Tool = {
 const triggerBackup: Tool = {
   name: 'trigger_backup',
   readOnly: false,
-  description: 'Manually trigger a backup by creating a Job from a CronJob. Only CronJobs labelled homelab.mcp/triggerable: "true" can be triggered.',
+  description: 'Manually trigger a backup by creating a Job from a CronJob in the backup-jobs namespace',
   inputSchema: {
     type: 'object',
     properties: {
@@ -100,8 +102,11 @@ const triggerBackup: Tool = {
     const namespace = params.namespace as string;
     const cronjobName = params.cronjob as string;
 
-    if (!DNS_1123_RE.test(namespace ?? '') || !DNS_1123_RE.test(cronjobName ?? '')) {
-      return validationError('namespace and cronjob must be DNS-1123 names (lowercase alphanumeric and hyphens).');
+    if (namespace !== BACKUP_NAMESPACE) {
+      return notAllowedError(`Triggering CronJobs outside the ${BACKUP_NAMESPACE} namespace`);
+    }
+    if (!DNS_1123_RE.test(cronjobName ?? '')) {
+      return validationError('cronjob must be a DNS-1123 name (lowercase alphanumeric and hyphens).');
     }
 
     try {
@@ -110,14 +115,6 @@ const triggerBackup: Tool = {
 
       const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
       const cronjob = cronjobResp.body;
-
-      // Opt-in gate: only CronJobs whose manifest carries the triggerable label can be run by hand.
-      if (!isCronjobTriggerable(cronjob.metadata?.labels)) {
-        return notTriggerableError(
-          `CronJob ${namespace}/${cronjobName} is not opted in for manual triggering. ` +
-            `Add label '${TRIGGERABLE_LABEL}: "true"' to its manifest if it is safe to run on demand.`
-        );
-      }
 
       const jobName = `${cronjobName}-manual-${Date.now()}`;
 
