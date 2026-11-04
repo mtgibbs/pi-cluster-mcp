@@ -94,7 +94,7 @@ describe('touchPath shell command', () => {
     '/volume1/media/movies/$(id) `id` ; & | !',
   ])('passes %s to the shell as a single literal argument', async (path) => {
     await touchPath(path);
-    expect(argsSeenByShell(sshExec.mock.calls[0][0] as string)).toEqual([path]);
+    expect(argsSeenByShell((sshExec.mock.calls as string[][])[0][0])).toEqual([path]);
   });
 });
 

@@ -52,7 +52,7 @@ export function validateNasPath(path: unknown): string {
   if (typeof path !== 'string' || path.length === 0 || path.length > 1024) {
     throw new Error('Path must be a non-empty string of at most 1024 characters');
   }
-  if (/[\x00-\x1f\x7f]/.test(path)) {
+  if ([...path].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) {
     throw new Error('Path must not contain control characters');
   }
   if (!path.startsWith('/') || posix.normalize(path) !== path || path.split('/').includes('..')) {
