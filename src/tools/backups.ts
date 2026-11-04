@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError } from '../utils/errors.js';
+import { validationError, k8sError, notTriggerableError } from '../utils/errors.js';
+import { isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
@@ -86,7 +87,7 @@ const getBackupStatus: Tool = {
 const triggerBackup: Tool = {
   name: 'trigger_backup',
   readOnly: false,
-  description: 'Manually trigger a backup by creating a Job from a CronJob',
+  description: 'Manually trigger a backup by creating a Job from a CronJob. Only CronJobs labelled homelab.mcp/triggerable: "true" can be triggered.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -99,12 +100,24 @@ const triggerBackup: Tool = {
     const namespace = params.namespace as string;
     const cronjobName = params.cronjob as string;
 
+    if (!DNS_1123_RE.test(namespace ?? '') || !DNS_1123_RE.test(cronjobName ?? '')) {
+      return validationError('namespace and cronjob must be DNS-1123 names (lowercase alphanumeric and hyphens).');
+    }
+
     try {
       const kc = getKubeConfig();
       const batchApi = kc.makeApiClient(k8s.BatchV1Api);
 
       const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
       const cronjob = cronjobResp.body;
+
+      // Opt-in gate: only CronJobs whose manifest carries the triggerable label can be run by hand.
+      if (!isCronjobTriggerable(cronjob.metadata?.labels)) {
+        return notTriggerableError(
+          `CronJob ${namespace}/${cronjobName} is not opted in for manual triggering. ` +
+            `Add label '${TRIGGERABLE_LABEL}: "true"' to its manifest if it is safe to run on demand.`
+        );
+      }
 
       const jobName = `${cronjobName}-manual-${Date.now()}`;
 
