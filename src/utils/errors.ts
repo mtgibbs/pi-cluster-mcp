@@ -28,6 +28,10 @@ export function alreadyRunningError(message: string): ToolError {
   return createError('ALREADY_RUNNING', message);
 }
 
+export function rateLimitedError(message: string): ToolError {
+  return createError('RATE_LIMITED', message);
+}
+
 export function k8sError(error: unknown): ToolError {
   // K8s client errors often have detailed info in response.body
   if (error && typeof error === 'object') {

@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import { NodeSSH } from 'node-ssh';
 
 const NAS_HOST = process.env.NAS_HOST;
@@ -45,29 +46,38 @@ async function getConnection(): Promise<NodeSSH> {
   return sshClient;
 }
 
-function sanitizePath(path: string): string {
-  // Strip shell metacharacters
-  const sanitized = path.replace(/[;&|`$(){}!#]/g, '');
-
-  // Reject path traversal
-  if (sanitized.includes('..')) {
-    throw new Error('Path traversal not allowed');
+// Rejects (never strips) anything that isn't a plain absolute path inside an allowed prefix.
+// Stripping metacharacters left `"` and newlines through, which broke out of the quoted command.
+export function validateNasPath(path: unknown): string {
+  if (typeof path !== 'string' || path.length === 0 || path.length > 1024) {
+    throw new Error('Path must be a non-empty string of at most 1024 characters');
+  }
+  if (/[\x00-\x1f\x7f]/.test(path)) {
+    throw new Error('Path must not contain control characters');
+  }
+  if (!path.startsWith('/') || posix.normalize(path) !== path || path.split('/').includes('..')) {
+    throw new Error('Path must be absolute and normalized (no "..", "." or "//" segments)');
   }
 
-  return sanitized;
-}
-
-function validatePath(path: string): void {
   if (ALLOWED_PATH_PREFIXES.length === 0) {
     throw new Error('NAS_ALLOWED_PATHS not configured, no paths are allowed');
   }
-
-  const isAllowed = ALLOWED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+  // Whole-segment match: /volume1/media must not admit /volume1/media-private.
+  const isAllowed = ALLOWED_PATH_PREFIXES.some((prefix) => {
+    const base = prefix.replace(/\/+$/, '');
+    return path === base || path.startsWith(`${base}/`);
+  });
   if (!isAllowed) {
     throw new Error(
-      `Path not allowed. Must start with one of: ${ALLOWED_PATH_PREFIXES.join(', ')}`
+      `Path not allowed. Must be inside one of: ${ALLOWED_PATH_PREFIXES.join(', ')}`
     );
   }
+  return path;
+}
+
+// POSIX single-quote escaping: nothing inside '...' is special to the shell except ' itself.
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 async function execCommand(command: string): Promise<{ stdout: string; stderr: string }> {
@@ -80,22 +90,19 @@ async function execCommand(command: string): Promise<{ stdout: string; stderr: s
 }
 
 export async function touchPath(path: string): Promise<void> {
-  const safePath = sanitizePath(path);
-  validatePath(safePath);
-  await execCommand(`touch "${safePath}"`);
+  const safePath = validateNasPath(path);
+  await execCommand(`touch -- ${shellQuote(safePath)}`);
 }
 
 export async function checkPath(path: string): Promise<boolean> {
-  const safePath = sanitizePath(path);
-  validatePath(safePath);
-  const result = await execCommand(`test -e "${safePath}" && echo "exists"`);
+  const safePath = validateNasPath(path);
+  const result = await execCommand(`test -e ${shellQuote(safePath)} && echo exists`);
   return result.stdout.trim() === 'exists';
 }
 
 export async function listPath(path: string): Promise<string[]> {
-  const safePath = sanitizePath(path);
-  validatePath(safePath);
-  const result = await execCommand(`ls -1 "${safePath}"`);
+  const safePath = validateNasPath(path);
+  const result = await execCommand(`ls -1 -- ${shellQuote(safePath)}`);
   return result.stdout.trim().split('\n').filter((line) => line.length > 0);
 }
 

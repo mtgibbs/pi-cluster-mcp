@@ -1,7 +1,9 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
-import { k8sError } from '../utils/errors.js';
+import { k8sError, validationError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
+
+const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
 interface ExternalSecret {
   metadata: {
@@ -96,6 +98,10 @@ const refreshSecret: Tool = {
   handler: async (params) => {
     const namespace = params.namespace as string;
     const name = params.name as string;
+
+    if (!DNS_1123_RE.test(namespace ?? '') || !DNS_1123_RE.test(name ?? '')) {
+      return validationError('namespace and name must be DNS-1123 names (lowercase alphanumeric and hyphens).');
+    }
 
     try {
       const api = getCustomObjectsApi();
