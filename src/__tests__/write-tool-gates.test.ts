@@ -11,8 +11,14 @@ vi.mock('node-ssh', () => ({
 }));
 
 const patchCustom = vi.fn();
+const getCustom = vi.fn();
+const listCustom = vi.fn();
 vi.mock('../clients/kubernetes.js', () => ({
-  getCustomObjectsApi: (): unknown => ({ patchNamespacedCustomObject: patchCustom }),
+  getCustomObjectsApi: (): unknown => ({
+    patchNamespacedCustomObject: patchCustom,
+    getNamespacedCustomObject: getCustom,
+    listClusterCustomObject: listCustom,
+  }),
   getCoreApi: (): unknown => ({}),
   getKubeConfig: (): unknown => ({ makeApiClient: (): unknown => ({}) }),
   listPods: vi.fn(),
@@ -115,8 +121,17 @@ describe('fix_jellyfin_metadata itemId', () => {
   });
 });
 
-describe('refresh_secret names', () => {
-  beforeEach(() => patchCustom.mockReset().mockResolvedValue({}));
+describe('refresh_secret gates', () => {
+  beforeEach(() => {
+    patchCustom.mockReset().mockResolvedValue({});
+    getCustom.mockReset().mockResolvedValue({ body: { metadata: { labels: { 'kustomize.toolkit.fluxcd.io/name': 'media' } } } });
+  });
+
+  it('refuses an ExternalSecret not applied by Flux', async () => {
+    getCustom.mockResolvedValue({ body: { metadata: { labels: {} } } });
+    expect(await handler('refresh_secret')({ namespace: 'default', name: 'handmade' })).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(patchCustom).not.toHaveBeenCalled();
+  });
 
   it('refuses non-DNS-1123 names without patching', async () => {
     expect(await handler('refresh_secret')({ namespace: 'media', name: '../x' })).toMatchObject({ code: 'VALIDATION_ERROR' });
@@ -145,5 +160,43 @@ describe('update_pihole_gravity rate gate', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('reconcile_flux scope gate', () => {
+  const reconcile = (resource?: string): Promise<unknown> =>
+    handler('reconcile_flux')(resource ? { resource } : {});
+  beforeEach(() => {
+    patchCustom.mockReset().mockResolvedValue({});
+    getCustom.mockReset();
+    listCustom.mockReset();
+  });
+
+  it('only reconciles Kustomizations in flux-system', async () => {
+    expect(await reconcile('kustomization/media/sonarr')).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(patchCustom).not.toHaveBeenCalled();
+    expect(await reconcile('kustomization/flux-system/media')).toMatchObject({ success: true });
+    expect(patchCustom).toHaveBeenCalledOnce();
+  });
+
+  it('only reconciles HelmReleases applied by a Flux Kustomization', async () => {
+    getCustom.mockResolvedValueOnce({ body: { metadata: { labels: {} } } });
+    expect(await reconcile('helmrelease/default/handmade')).toMatchObject({ code: 'NOT_ALLOWED' });
+    expect(patchCustom).not.toHaveBeenCalled();
+
+    getCustom.mockResolvedValueOnce({ body: { metadata: { labels: { 'kustomize.toolkit.fluxcd.io/name': 'monitoring' } } } });
+    expect(await reconcile('helmrelease/monitoring/kube-prometheus-stack')).toMatchObject({ success: true });
+    expect(patchCustom).toHaveBeenCalledOnce();
+  });
+
+  it('reconcile-all skips Kustomizations outside flux-system', async () => {
+    listCustom.mockResolvedValue({
+      body: { items: [
+        { metadata: { namespace: 'flux-system', name: 'a' } },
+        { metadata: { namespace: 'rogue', name: 'b' } },
+      ] },
+    });
+    expect(await reconcile()).toMatchObject({ success: true, reconciled: ['flux-system/a'] });
+    expect(patchCustom).toHaveBeenCalledOnce();
   });
 });

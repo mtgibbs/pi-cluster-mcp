@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
-import { k8sError, validationError } from '../utils/errors.js';
+import { k8sError, validationError, notAllowedError } from '../utils/errors.js';
+import { FLUX_MANAGED_LABEL } from './flux.js';
 import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
@@ -106,6 +107,13 @@ const refreshSecret: Tool = {
     try {
       const api = getCustomObjectsApi();
       const now = new Date().toISOString();
+
+      // Scope gate: only ExternalSecrets applied by Flux (GitOps-managed), same rule as reconcile_flux.
+      const es = (await api.getNamespacedCustomObject('external-secrets.io', 'v1', namespace, 'externalsecrets', name))
+        .body as { metadata?: { labels?: Record<string, string> } };
+      if (!es.metadata?.labels?.[FLUX_MANAGED_LABEL]) {
+        return notAllowedError(`Refreshing ExternalSecret ${namespace}/${name}, which is not applied by a Flux Kustomization,`);
+      }
 
       const patch = {
         metadata: {

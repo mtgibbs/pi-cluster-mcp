@@ -1,7 +1,13 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
-import { k8sError } from '../utils/errors.js';
+import { k8sError, notAllowedError } from '../utils/errors.js';
 import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
+
+// Scope gate for reconcile_flux: only GitOps-managed objects. Every Flux Kustomization lives in
+// flux-system; a HelmRelease must carry the label kustomize-controller stamps on what it applies,
+// so a hand-made HelmRelease elsewhere can't be driven through this tool.
+export const FLUX_NAMESPACE = 'flux-system';
+export const FLUX_MANAGED_LABEL = 'kustomize.toolkit.fluxcd.io/name';
 
 interface FluxResource {
   metadata: {
@@ -125,6 +131,18 @@ const reconcileFlux: Tool = {
           : 'helm.toolkit.fluxcd.io';
         const version = type === 'kustomization' ? 'v1' : 'v2';
 
+        if (type === 'kustomization' && namespace !== FLUX_NAMESPACE) {
+          return notAllowedError(`Reconciling Kustomizations outside ${FLUX_NAMESPACE}`);
+        }
+        if (type === 'helmrelease') {
+          const hr = (await api.getNamespacedCustomObject(group, version, namespace, plural, name)).body as {
+            metadata?: { labels?: Record<string, string> };
+          };
+          if (!hr.metadata?.labels?.[FLUX_MANAGED_LABEL]) {
+            return notAllowedError(`Reconciling HelmRelease ${namespace}/${name}, which is not applied by a Flux Kustomization,`);
+          }
+        }
+
         const patch = {
           metadata: {
             annotations: {
@@ -153,7 +171,7 @@ const reconcileFlux: Tool = {
       const kustomizations = kustomizationsResp.body as FluxListResponse;
 
       const results = [];
-      for (const ks of kustomizations.items) {
+      for (const ks of kustomizations.items.filter((k) => k.metadata.namespace === FLUX_NAMESPACE)) {
         const patch = {
           metadata: {
             annotations: {
