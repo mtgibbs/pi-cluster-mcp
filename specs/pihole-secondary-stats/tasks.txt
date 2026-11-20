@@ -1,0 +1,4 @@
+T1: Add PIHOLE_URLS parsing, getPiholeUrls(), and per-URL session/login/rate-limit state in src/clients/pihole.ts.
+T2: Add getFullStatsPerInstance(), aggregateStats() and the PiholeInstanceStats interface in src/clients/pihole.ts, keeping the existing getFullStats/getSummary/getMessages/getWhitelist/getRecentQueries/updateGravity exports intact.
+T3: Make get_dns_status in src/tools/dns.ts publish aggregated stats plus a per-instance `instances` array when more than one host is configured, leaving single-host output unchanged and the tool readOnly.
+T4: Add src/__tests__/pihole-multi-instance.test.ts with the six exact it() titles and fixture values listed in spec.md §11.
