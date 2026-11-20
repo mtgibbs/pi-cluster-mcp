@@ -31,6 +31,7 @@ interface TailscaleConnectorList {
 
 const getTailscaleStatus: Tool = {
   name: 'get_tailscale_status',
+  readOnly: true,
   description: 'Get Tailscale connector status including exit node and routes',
   inputSchema: {
     type: 'object',

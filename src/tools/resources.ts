@@ -338,6 +338,7 @@ async function getResourceDetail(kind: ResourceKind, namespace: string, name: st
 
 const describeResource: Tool = {
   name: 'describe_resource',
+  readOnly: true,
   description: 'Inspect Kubernetes resources. Without a name, lists all resources of that kind in a namespace. With a name, returns detailed spec including containers, volumes, probes, and status. Secret env values are redacted. Supported kinds: deployment, statefulset, daemonset, pod, service, configmap.',
   inputSchema: {
     type: 'object',

@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { createServer } from './server.js';
-import { requireAuth } from './auth.js';
+import { requireAuth, type AuthScope } from './auth.js';
 
 const transport = process.env.MCP_TRANSPORT || 'stdio';
 const port = parseInt(process.env.MCP_PORT || '3000', 10);
@@ -24,13 +24,14 @@ async function main(): Promise<void> {
     });
 
     // Session management
-    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const sessions = new Map<string, { transport: StreamableHTTPServerTransport; scope: AuthScope }>();
 
     // MCP endpoint handles GET (SSE stream), POST (messages), DELETE (close session)
     app.all('/mcp', async (req, res) => {
       // Auth check
+      let scope: AuthScope;
       try {
-        requireAuth(req.headers as Record<string, string>);
+        scope = requireAuth(req.headers);
       } catch {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -39,21 +40,26 @@ async function main(): Promise<void> {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
       if (sessionId && sessions.has(sessionId)) {
-        const sessionTransport = sessions.get(sessionId)!;
-        await sessionTransport.handleRequest(req, res, req.body);
+        const session = sessions.get(sessionId)!;
+        // A session keeps the scope it was opened with; a read-only key can't ride a full session.
+        if (session.scope !== scope) {
+          res.status(403).json({ error: 'Forbidden: API key does not match session scope' });
+          return;
+        }
+        await session.transport.handleRequest(req, res, req.body);
       } else if (!sessionId && req.method === 'POST') {
         // New session initialization
         const httpTransport = new StreamableHTTPServerTransport({
           sessionIdGenerator: (): string => randomUUID(),
           onsessioninitialized: (sid: string): void => {
-            sessions.set(sid, httpTransport);
+            sessions.set(sid, { transport: httpTransport, scope });
             httpTransport.onclose = (): void => {
               sessions.delete(sid);
             };
           },
         });
 
-        const server = createServer();
+        const server = createServer(scope);
         await server.connect(httpTransport);
         await httpTransport.handleRequest(req, res, req.body);
       } else if (sessionId && req.method === 'POST') {
@@ -62,14 +68,14 @@ async function main(): Promise<void> {
         const httpTransport = new StreamableHTTPServerTransport({
           sessionIdGenerator: (): string => randomUUID(),
           onsessioninitialized: (sid: string): void => {
-            sessions.set(sid, httpTransport);
+            sessions.set(sid, { transport: httpTransport, scope });
             httpTransport.onclose = (): void => {
               sessions.delete(sid);
             };
           },
         });
 
-        const server = createServer();
+        const server = createServer(scope);
         await server.connect(httpTransport);
         await httpTransport.handleRequest(req, res, req.body);
       } else if (sessionId) {

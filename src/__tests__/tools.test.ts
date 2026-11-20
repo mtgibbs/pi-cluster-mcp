@@ -63,10 +63,16 @@ describe('tool registry', () => {
     // Arr shared tools
     expect(toolNames).toContain('get_quality_profile');
     expect(toolNames).toContain('reject_and_search');
+    // Mealie tools
+    expect(toolNames).toContain('get_mealie_status');
+    expect(toolNames).toContain('search_mealie_recipes');
+    expect(toolNames).toContain('get_mealie_recipe');
+    expect(toolNames).toContain('import_mealie_recipe_url');
+    expect(toolNames).toContain('parse_mealie_recipe_ingredients');
   });
 
   it('has the expected total tool count', () => {
-    expect(tools).toHaveLength(46);
+    expect(tools).toHaveLength(51);
   });
 
   it('has no duplicate tool names', () => {
@@ -96,6 +102,23 @@ describe('deployment whitelist', () => {
     expect(isDeploymentAllowed('uptime-kuma', 'uptime-kuma')).toBe(true);
   });
 
+  it('allows the external-secrets controller (infra exception)', () => {
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets')).toBe(true);
+  });
+
+  it('still rejects the rest of the external-secrets namespace', () => {
+    // Only the controller is allowed; the webhook and cert-controller are not, and
+    // restarting the webhook can block every admission request in the cluster.
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets-webhook')).toBe(false);
+    expect(isDeploymentAllowed('external-secrets', 'external-secrets-cert-controller')).toBe(false);
+  });
+
+  it('still rejects the Flux controllers', () => {
+    expect(isDeploymentAllowed('flux-system', 'source-controller')).toBe(false);
+    expect(isDeploymentAllowed('flux-system', 'kustomize-controller')).toBe(false);
+    expect(isDeploymentAllowed('flux-system', 'image-automation-controller')).toBe(false);
+  });
+
   it('rejects non-whitelisted deployments', () => {
     expect(isDeploymentAllowed('kube-system', 'coredns')).toBe(false);
     expect(isDeploymentAllowed('default', 'anything')).toBe(false);
@@ -104,7 +127,7 @@ describe('deployment whitelist', () => {
 
   it('returns all allowed deployments', () => {
     const allowed = getAllowedDeployments();
-    expect(allowed).toHaveLength(20);
+    expect(allowed).toHaveLength(21);
     expect(allowed).toContain('jellyfin/jellyfin');
     expect(allowed).toContain('media/sonarr');
     expect(allowed).toContain('media/radarr');

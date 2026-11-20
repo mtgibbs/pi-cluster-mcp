@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.2.1](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.2.0...homelab-mcp-v0.2.1) (2026-11-04)
+
+
+### Features
+
+* **auth:** optional read-only API key scoped to read-only tools ([#57](https://github.com/mtgibbs/pi-cluster-mcp/issues/57)) ([23bab4d](https://github.com/mtgibbs/pi-cluster-mcp/commit/23bab4dec78e51dd877bc8bb37d31cff2ca6ab0b))
+
+## [0.2.0](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.26...homelab-mcp-v0.2.0) (2026-09-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* the default response shape of the six tools above changed; pass detail:"full" for the previous output.
+
+### Features
+
+* **cluster:** allow rolling-restart of the external-secrets controller ([ea630e5](https://github.com/mtgibbs/pi-cluster-mcp/commit/ea630e53f9ea06f74a120e8e3c7aa3cad141637c))
+* summary-first output for list tools ([bfb1018](https://github.com/mtgibbs/pi-cluster-mcp/commit/bfb1018a94aff29ee07fa2deb8f75a33eb71d8e6))
+
+## [0.1.26](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.25...homelab-mcp-v0.1.26) (2026-08-02)
+
+
+### Bug Fixes
+
+* **dns:** stop counting completed CronJob pods against Pi-hole's health verdict ([34ed813](https://github.com/mtgibbs/pi-cluster-mcp/commit/34ed8131ccfaab442c7a73c9c3465b9c6b235282))
+* **pihole:** single-flight login (429 lockout) + stop counting Job pods as unhealthy ([0d5b814](https://github.com/mtgibbs/pi-cluster-mcp/commit/0d5b8147fd9a76f03189ea418663425981b99b7e))
+* **pihole:** single-flight login so concurrent requests stop tripping FTL's rate limiter ([#48](https://github.com/mtgibbs/pi-cluster-mcp/issues/48)) ([8d86d3c](https://github.com/mtgibbs/pi-cluster-mcp/commit/8d86d3cd3329e51b41c991ce344d4d0feca55d99))
+
+## [0.1.25](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.24...homelab-mcp-v0.1.25) (2026-08-02)
+
+
+### Bug Fixes
+
+* **pihole:** authenticate stats/summary — Pi-hole v6 requires a session ([#44](https://github.com/mtgibbs/pi-cluster-mcp/issues/44)) ([#46](https://github.com/mtgibbs/pi-cluster-mcp/issues/46)) ([31ef9bd](https://github.com/mtgibbs/pi-cluster-mcp/commit/31ef9bd1d2b4073fb09307552d2ea8e37246503d))
+
+## [0.1.24](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.23...homelab-mcp-v0.1.24) (2026-07-14)
+
+
+### Bug Fixes
+
+* get-or-create foods/units before parsed-ingredient write-back ([#42](https://github.com/mtgibbs/pi-cluster-mcp/issues/42)) ([6416cf3](https://github.com/mtgibbs/pi-cluster-mcp/commit/6416cf33cc8f75c4135a1dde6442aa1134b72587))
+
+## [0.1.23](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.22...homelab-mcp-v0.1.23) (2026-07-14)
+
+
+### Features
+
+* structured ingredient parsing for Mealie imports ([#40](https://github.com/mtgibbs/pi-cluster-mcp/issues/40)) ([2bda957](https://github.com/mtgibbs/pi-cluster-mcp/commit/2bda957f95ea31acdd6ce2da7c31ffcbff4caf91))
+
+## [0.1.22](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.21...homelab-mcp-v0.1.22) (2026-07-14)
+
+
+### Features
+
+* Mealie recipe tools (status, search, get, import-from-URL) ([#38](https://github.com/mtgibbs/pi-cluster-mcp/issues/38)) ([40aa9da](https://github.com/mtgibbs/pi-cluster-mcp/commit/40aa9dad76627a392f36aee94b715f22b5072ad2))
+
+## [0.1.21](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.20...homelab-mcp-v0.1.21) (2026-03-02)
+
+
+### Features
+
+* **dns:** add diagnose_dns tool and expand restart whitelist ([5ab1d07](https://github.com/mtgibbs/pi-cluster-mcp/commit/5ab1d07173e2eff1bc1fcfb6370d5d527604ae41))
+
+
+### Bug Fixes
+
+* **dns:** resolve ESLint errors in diagnose_dns tool ([8f10581](https://github.com/mtgibbs/pi-cluster-mcp/commit/8f1058165f481f06848ffe62488690da03aebc52))
+
 ## [0.1.20](https://github.com/mtgibbs/pi-cluster-mcp/compare/homelab-mcp-v0.1.19...homelab-mcp-v0.1.20) (2026-02-06)
 
 

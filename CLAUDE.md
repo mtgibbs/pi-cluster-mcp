@@ -59,7 +59,7 @@ homelab-mcp/
 │   │   ├── flux.ts              # get_flux_status, reconcile_flux
 │   │   ├── certificates.ts      # get_certificate_status
 │   │   ├── secrets.ts           # get_secrets_status, refresh_secret
-│   │   ├── backups.ts           # get_backup_status, trigger_backup, get_cronjob_details, get_job_logs
+│   │   ├── backups.ts           # get_backup_status, trigger_cronjob, trigger_backup, get_cronjob_details, get_job_logs
 │   │   ├── ingress.ts           # get_ingress_status
 │   │   ├── tailscale.ts         # get_tailscale_status
 │   │   ├── media.ts             # get_media_status, fix_jellyfin_metadata
@@ -153,7 +153,7 @@ Only these deployments can be restarted via `restart_deployment`:
 
 ### Manual CronJob Triggering (Opt-In Label)
 
-`trigger_cronjob` (and its `trigger_backup` alias) will only run a CronJob that carries the label:
+`trigger_cronjob` will only run a CronJob that carries the label:
 
 ```yaml
 metadata:
@@ -277,7 +277,7 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `restart_deployment` | `namespace`, `deployment` | Rollout restart (whitelisted only) |
 | `fix_jellyfin_metadata` | `name` | Find item in DB, trigger API refresh |
 | `trigger_cronjob` | `namespace`, `cronjob` | Run a CronJob now (Job from its template). **Requires opt-in label** `homelab.mcp/triggerable: "true"` |
-| `trigger_backup` | `namespace`, `cronjob` | Alias of `trigger_cronjob` (back-compat); same opt-in label required |
+| `trigger_backup` | `namespace`, `cronjob` | Create Job from a CronJob. **Not** an alias of `trigger_cronjob`: pinned to the `backup-jobs` namespace, no opt-in label |
 | `test_dns_query` | `domain`, `type?` | Run dig against Pi-hole |
 | `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |
@@ -350,6 +350,26 @@ flux reconcile kustomization mcp-homelab
 - Build multi-arch container (arm64 + amd64)
 - Push to ghcr.io/mtgibbs/homelab-mcp
 - Create GitHub release
+
+## Response Conventions: Summary-First
+
+Tools are called by small local models (e.g. `hot-coder` via Goose) as well as Claude. Small
+models relay verdicts well but miscount long lists and exhaust context on big payloads, so
+**list tools do the counting, grouping and filtering themselves** (`src/utils/summary.ts`):
+
+- Take `...DETAIL_PARAM` in the input schema. `detail: "summary"` (the default) returns
+  pre-computed counts, a boolean verdict (`allReady` / `allSynced` / `allBound` / `allHealthy`),
+  and **only the items needing attention**; healthy items are counted, not listed.
+  `detail: "full"` returns every item, in the pre-existing shape.
+- Group identical items instead of repeating them (`summarizeQueue`: title + state + reason → one
+  row with a `count` and the `queueIds`).
+- Cap lists with `capList` and say how to get the rest; no single response should be huge.
+- If a tool states a conclusion, it must be correct — small models repeat tool conclusions verbatim.
+
+Adopted by: `get_flux_status`, `get_certificate_status`, `get_secrets_status`, `get_pvcs`,
+`get_sonarr_queue`, `get_radarr_queue`. `get_backup_status` (a short list) keeps its items and
+adds a computed `lastRunFailed` per job. Measured by the read-only exam in pi-cluster
+`docs/research/goose-hot-coder-eval/`.
 
 ## Adding New Tools
 

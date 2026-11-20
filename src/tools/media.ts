@@ -3,11 +3,14 @@ import { listPods } from '../clients/kubernetes.js';
 import { searchItems, refreshItemMetadata, formatItemName, getJellyfinStats } from '../clients/jellyfin.js';
 import { getImmichStats } from '../clients/immich.js';
 import { getAllowedPaths } from '../clients/synology.js';
-import { k8sError } from '../utils/errors.js';
+import { k8sError, validationError } from '../utils/errors.js';
 import * as k8s from '@kubernetes/client-node';
+
+const JELLYFIN_ITEM_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
 const getMediaStatus: Tool = {
   name: 'get_media_status',
+  readOnly: true,
   description: 'Get media services health (Jellyfin, Immich) including library stats and active sessions. Check this if media services are down.',
   inputSchema: {
     type: 'object',
@@ -99,6 +102,7 @@ const getMediaStatus: Tool = {
 
 const fixJellyfinMetadata: Tool = {
   name: 'fix_jellyfin_metadata',
+  readOnly: false,
   description: 'Search for a media item in Jellyfin and trigger a metadata refresh. Use this when media items have incorrect or missing info.',
   inputSchema: {
     type: 'object',
@@ -112,6 +116,12 @@ const fixJellyfinMetadata: Tool = {
     const searchName = params.name as string | undefined;
     const directItemId = params.itemId as string | undefined;
     const replaceAll = (params.replaceAll as boolean) || false;
+
+    // Jellyfin item IDs are GUIDs (32 hex, optionally dashed). Anything else would be spliced into
+    // the /Items/<id>/Refresh URL path, e.g. "../" to reach another admin endpoint.
+    if (directItemId !== undefined && !JELLYFIN_ITEM_ID_RE.test(String(directItemId))) {
+      return validationError('itemId must be a Jellyfin item ID (32 hex characters, optionally dashed)');
+    }
 
     if (!searchName && !directItemId) {
       return {
@@ -183,6 +193,7 @@ const fixJellyfinMetadata: Tool = {
 
 const touchNasPath: Tool = {
   name: 'touch_nas_path',
+  readOnly: false,
   description: `SSH to Synology NAS and touch a path to update timestamps. Restricted to: ${getAllowedPaths().join(', ')}`,
   inputSchema: {
     type: 'object',

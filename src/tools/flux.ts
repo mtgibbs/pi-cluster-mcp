@@ -1,6 +1,13 @@
 import type { Tool } from './index.js';
 import { getCustomObjectsApi } from '../clients/kubernetes.js';
-import { k8sError } from '../utils/errors.js';
+import { k8sError, notAllowedError } from '../utils/errors.js';
+import { DETAIL_PARAM, getDetail, OMITTED_NOTE } from '../utils/summary.js';
+
+// Scope gate for reconcile_flux: only GitOps-managed objects. Every Flux Kustomization lives in
+// flux-system; a HelmRelease must carry the label kustomize-controller stamps on what it applies,
+// so a hand-made HelmRelease elsewhere can't be driven through this tool.
+export const FLUX_NAMESPACE = 'flux-system';
+export const FLUX_MANAGED_LABEL = 'kustomize.toolkit.fluxcd.io/name';
 
 interface FluxResource {
   metadata: {
@@ -23,12 +30,13 @@ interface FluxListResponse {
 
 const getFluxStatus: Tool = {
   name: 'get_flux_status',
-  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing.',
+  readOnly: true,
+  description: 'Get Flux GitOps sync status for Kustomizations and HelmReleases. Check this if deployments aren\'t syncing. Returns ready/not-ready counts and only the not-Ready resources by default.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: { ...DETAIL_PARAM },
   },
-  handler: async () => {
+  handler: async (params) => {
     try {
       const api = getCustomObjectsApi();
 
@@ -51,9 +59,26 @@ const getFluxStatus: Tool = {
         };
       };
 
+      const ks = kustomizations.items.map(formatResource);
+      const hrs = helmReleases.items.map(formatResource);
+      const counts = (rs: Array<{ ready: boolean }>): { total: number; ready: number; notReady: number } => ({
+        total: rs.length,
+        ready: rs.filter((r) => r.ready).length,
+        notReady: rs.filter((r) => !r.ready).length,
+      });
+      const summary = { kustomizations: counts(ks), helmReleases: counts(hrs) };
+
+      if (getDetail(params) === 'full') {
+        return { summary, kustomizations: ks, helmReleases: hrs };
+      }
       return {
-        kustomizations: kustomizations.items.map(formatResource),
-        helmReleases: helmReleases.items.map(formatResource),
+        summary,
+        allReady: summary.kustomizations.notReady === 0 && summary.helmReleases.notReady === 0,
+        notReady: {
+          kustomizations: ks.filter((r) => !r.ready),
+          helmReleases: hrs.filter((r) => !r.ready),
+        },
+        note: OMITTED_NOTE,
       };
     } catch (error) {
       return k8sError(error);
@@ -63,6 +88,7 @@ const getFluxStatus: Tool = {
 
 const reconcileFlux: Tool = {
   name: 'reconcile_flux',
+  readOnly: false,
   description: 'Trigger Flux reconciliation for a specific resource or all resources. Use this to force an immediate sync of GitOps resources.',
   inputSchema: {
     type: 'object',
@@ -105,6 +131,18 @@ const reconcileFlux: Tool = {
           : 'helm.toolkit.fluxcd.io';
         const version = type === 'kustomization' ? 'v1' : 'v2';
 
+        if (type === 'kustomization' && namespace !== FLUX_NAMESPACE) {
+          return notAllowedError(`Reconciling Kustomizations outside ${FLUX_NAMESPACE}`);
+        }
+        if (type === 'helmrelease') {
+          const hr = (await api.getNamespacedCustomObject(group, version, namespace, plural, name)).body as {
+            metadata?: { labels?: Record<string, string> };
+          };
+          if (!hr.metadata?.labels?.[FLUX_MANAGED_LABEL]) {
+            return notAllowedError(`Reconciling HelmRelease ${namespace}/${name}, which is not applied by a Flux Kustomization,`);
+          }
+        }
+
         const patch = {
           metadata: {
             annotations: {
@@ -133,7 +171,7 @@ const reconcileFlux: Tool = {
       const kustomizations = kustomizationsResp.body as FluxListResponse;
 
       const results = [];
-      for (const ks of kustomizations.items) {
+      for (const ks of kustomizations.items.filter((k) => k.metadata.namespace === FLUX_NAMESPACE)) {
         const patch = {
           metadata: {
             annotations: {
