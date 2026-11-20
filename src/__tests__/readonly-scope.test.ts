@@ -47,7 +47,7 @@ describe('authenticate', () => {
 describe('read-only tool scope', () => {
   // Every tool that changes state somewhere. Pinned here so reclassifying one is a visible diff.
   const WRITE_TOOLS = [
-    'restart_deployment', 'reconcile_flux', 'refresh_secret', 'trigger_backup',
+    'restart_deployment', 'reconcile_flux', 'refresh_secret', 'trigger_backup', 'trigger_cronjob',
     'fix_jellyfin_metadata', 'touch_nas_path', 'update_pihole_gravity',
     'import_mealie_recipe_url', 'parse_mealie_recipe_ingredients',
     'retry_sabnzbd_download', 'pause_resume_sabnzbd',

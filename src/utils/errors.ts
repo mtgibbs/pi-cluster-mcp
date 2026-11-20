@@ -24,6 +24,10 @@ export function validationError(message: string): ToolError {
   return createError('VALIDATION_ERROR', message);
 }
 
+export function notTriggerableError(message: string): ToolError {
+  return createError('NOT_TRIGGERABLE', message);
+}
+
 export function alreadyRunningError(message: string): ToolError {
   return createError('ALREADY_RUNNING', message);
 }

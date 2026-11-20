@@ -1,6 +1,7 @@
 import type { Tool } from './index.js';
 import { getKubeConfig, getCoreApi } from '../clients/kubernetes.js';
-import { validationError, k8sError, notAllowedError, alreadyRunningError } from '../utils/errors.js';
+import { validationError, k8sError, notAllowedError, notTriggerableError, alreadyRunningError } from '../utils/errors.js';
+import { isCronjobTriggerable, TRIGGERABLE_LABEL } from '../utils/whitelist.js';
 import * as k8s from '@kubernetes/client-node';
 
 const DNS_1123_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
@@ -79,6 +80,103 @@ const getBackupStatus: Tool = {
         },
         allHealthy: failed.length === 0,
         failures: failed.map((j: { name?: string; namespace?: string }) => `${j.namespace}/${j.name}`),
+      };
+    } catch (error) {
+      return k8sError(error);
+    }
+  },
+};
+
+// Runs ANY CronJob on demand, but only ones that opted in via the triggerable label.
+// Distinct from trigger_backup, which is pinned to the backup-jobs namespace and needs no label.
+const triggerCronjob: Tool = {
+  name: 'trigger_cronjob',
+  readOnly: false,
+  description:
+    'Manually run any opted-in CronJob now by creating a Job from its template (equivalent to `kubectl create job --from=cronjob/<name>`). Only CronJobs labelled homelab.mcp/triggerable="true" are eligible. Refuses if a run is already active.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      namespace: { type: 'string', description: 'CronJob namespace' },
+      cronjob: { type: 'string', description: 'CronJob name to run now' },
+    },
+    required: ['namespace', 'cronjob'],
+  },
+  handler: async (params) => {
+    const namespace = params.namespace as string;
+    const cronjobName = params.cronjob as string;
+
+    if (!DNS_1123_RE.test(namespace ?? '')) {
+      return validationError('Invalid namespace. Must match DNS-1123 format (lowercase alphanumeric and hyphens).');
+    }
+    if (!DNS_1123_RE.test(cronjobName ?? '')) {
+      return validationError('Invalid cronjob name. Must match DNS-1123 format (lowercase alphanumeric and hyphens).');
+    }
+
+    try {
+      const kc = getKubeConfig();
+      const batchApi = kc.makeApiClient(k8s.BatchV1Api);
+
+      const cronjobResp = await batchApi.readNamespacedCronJob(cronjobName, namespace);
+      const cronjob = cronjobResp.body;
+
+      // Opt-in gate: the label attests the job is idempotent and safe to run concurrently
+      // (a manual run bypasses the CronJob's concurrencyPolicy).
+      if (!isCronjobTriggerable(cronjob.metadata?.labels)) {
+        return notTriggerableError(
+          `CronJob ${namespace}/${cronjobName} is not opted in for manual triggering. ` +
+            `Add label '${TRIGGERABLE_LABEL}: "true"' to its manifest — only for jobs that are ` +
+            `idempotent and safe to run concurrently.`
+        );
+      }
+
+      // Guard A: refuse while a scheduled run (status.active) or a prior manual Job
+      // (cronjob-name label) is still active. Best-effort check-then-create.
+      const scheduledActive = cronjob.status?.active?.length ?? 0;
+      const manualJobs = await batchApi.listNamespacedJob(
+        namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        `cronjob-name=${cronjobName}`
+      );
+      const manualActive = manualJobs.body.items.filter((j) => (j.status?.active ?? 0) > 0).length;
+      if (scheduledActive + manualActive > 0) {
+        return alreadyRunningError(
+          `A run of ${namespace}/${cronjobName} is already active ` +
+            `(${scheduledActive} scheduled, ${manualActive} manual). Refusing to start an overlapping run.`
+        );
+      }
+
+      const jobSpec = cronjob.spec?.jobTemplate?.spec;
+      if (!jobSpec) {
+        return validationError(`CronJob ${namespace}/${cronjobName} has no jobTemplate.spec`);
+      }
+
+      const jobName = `${cronjobName}-manual-${Date.now()}`;
+      const job: k8s.V1Job = {
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        metadata: {
+          name: jobName,
+          namespace,
+          labels: {
+            'job-origin': 'manual-trigger',
+            'cronjob-name': cronjobName,
+          },
+        },
+        spec: jobSpec,
+      };
+
+      await batchApi.createNamespacedJob(namespace, job);
+
+      return {
+        success: true,
+        message: `Created Job ${jobName} from CronJob ${namespace}/${cronjobName}`,
+        jobName,
+        namespace,
+        cronjob: cronjobName,
       };
     } catch (error) {
       return k8sError(error);
@@ -315,4 +413,4 @@ const getJobLogs: Tool = {
   },
 };
 
-export const backupTools = [getBackupStatus, triggerBackup, getCronjobDetails, getJobLogs];
+export const backupTools = [getBackupStatus, triggerCronjob, triggerBackup, getCronjobDetails, getJobLogs];

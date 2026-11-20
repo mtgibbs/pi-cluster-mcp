@@ -59,7 +59,7 @@ homelab-mcp/
 │   │   ├── flux.ts              # get_flux_status, reconcile_flux
 │   │   ├── certificates.ts      # get_certificate_status
 │   │   ├── secrets.ts           # get_secrets_status, refresh_secret
-│   │   ├── backups.ts           # get_backup_status, trigger_backup, get_cronjob_details, get_job_logs
+│   │   ├── backups.ts           # get_backup_status, trigger_cronjob, trigger_backup, get_cronjob_details, get_job_logs
 │   │   ├── ingress.ts           # get_ingress_status
 │   │   ├── tailscale.ts         # get_tailscale_status
 │   │   ├── media.ts             # get_media_status, fix_jellyfin_metadata
@@ -150,6 +150,20 @@ Only these deployments can be restarted via `restart_deployment`:
 - `media/lidarr`
 - `media/jellyseerr`
 - `media/flaresolverr`
+
+### Manual CronJob Triggering (Opt-In Label)
+
+`trigger_cronjob` will only run a CronJob that carries the label:
+
+```yaml
+metadata:
+  labels:
+    homelab.mcp/triggerable: "true"
+```
+
+There is **no central whitelist** — the opt-in lives in each CronJob's manifest, reviewed at PR time. Adding the label is an **attestation that the job is idempotent and safe to run concurrently**: a manual trigger creates an independent Job that bypasses the CronJob's `concurrencyPolicy`, so it can overlap a scheduled run. The tool can only instantiate an existing CronJob's `jobTemplate` (no arbitrary pods/commands); the label is the authorization layer on top of the `create` Jobs RBAC.
+
+As a second layer, the tool also **refuses to start an overlapping run**: if a Job for the CronJob is already active (a scheduled run via `status.active`, or a prior manual trigger labelled `cronjob-name=<name>`), it returns `ALREADY_RUNNING`. This is best-effort (check-then-create), so the label's idempotency attestation still covers the residual race.
 
 ### Exec Tools Security
 
@@ -262,7 +276,8 @@ The `describe_resource` and `get_cronjob_details` tools sanitize environment var
 | `reconcile_flux` | `resource?` | Trigger Flux sync (all or specific) |
 | `restart_deployment` | `namespace`, `deployment` | Rollout restart (whitelisted only) |
 | `fix_jellyfin_metadata` | `name` | Find item in DB, trigger API refresh |
-| `trigger_backup` | `job_name` | Create Job from CronJob |
+| `trigger_cronjob` | `namespace`, `cronjob` | Run a CronJob now (Job from its template). **Requires opt-in label** `homelab.mcp/triggerable: "true"` |
+| `trigger_backup` | `namespace`, `cronjob` | Create Job from a CronJob. **Not** an alias of `trigger_cronjob`: pinned to the `backup-jobs` namespace, no opt-in label |
 | `test_dns_query` | `domain`, `type?` | Run dig against Pi-hole |
 | `update_pihole_gravity` | — | Re-download blocklists and rebuild gravity DB |
 | `refresh_secret` | `namespace`, `name` | Force ExternalSecret resync |
