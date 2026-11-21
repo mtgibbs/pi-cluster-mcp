@@ -1,6 +1,15 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod, readPodLog } from '../clients/kubernetes.js';
-import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
+import {
+  getFullStatsPerInstance,
+  aggregateStats,
+  getPiholeUrls,
+  getTopItems,
+  getMessages,
+  updateGravity,
+  getWhitelist,
+  getRecentQueries,
+} from '../clients/pihole.js';
 import { k8sError, notFoundError, rateLimitedError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
@@ -67,26 +76,56 @@ const getDnsStatus: Tool = {
       // Fetch Pi-hole stats and diagnostics if requested and Pi-hole is healthy
       if (includeStats && piholePods.some((p) => p.ready)) {
         try {
-          const [stats, messages] = await Promise.all([
-            getFullStats(5),
+          // Fan out to EVERY configured Pi-hole (#45): HA DNS runs two instances and the old
+          // single-`PIHOLE_URL` call only ever saw the primary's Service, so queries answered by
+          // the secondary — and a secondary-only auth failure — were invisible here.
+          // `getMessages` and `getTopItems` stay primary-only: the first is duplicated across the
+          // pair and the second is a list, not a counter, so fanning it out would only double the
+          // requests for an answer we would then have to merge by hand.
+          const [perInstance, topItems, messages] = await Promise.all([
+            getFullStatsPerInstance(5),
+            getTopItems(5),
             getMessages(),
           ]);
+          const summary = aggregateStats(perInstance);
           result.stats = {
-            status: stats.summary.status,
-            queriesToday: stats.summary.dns_queries_today,
-            blockedToday: stats.summary.ads_blocked_today,
-            blockedPercentage: stats.summary.ads_percentage_today,
-            domainsBlocked: stats.summary.domains_being_blocked,
-            uniqueDomains: stats.summary.unique_domains,
-            queriesForwarded: stats.summary.queries_forwarded,
-            queriesCached: stats.summary.queries_cached,
-            uniqueClients: stats.summary.unique_clients,
-            gravityUpdated: stats.summary.gravity_last_updated?.relative
-              ? `${stats.summary.gravity_last_updated.relative.days}d ${stats.summary.gravity_last_updated.relative.hours}h ago`
+            status: summary.status,
+            queriesToday: summary.dns_queries_today,
+            blockedToday: summary.ads_blocked_today,
+            blockedPercentage: summary.ads_percentage_today,
+            domainsBlocked: summary.domains_being_blocked,
+            uniqueDomains: summary.unique_domains,
+            queriesForwarded: summary.queries_forwarded,
+            queriesCached: summary.queries_cached,
+            uniqueClients: summary.unique_clients,
+            gravityUpdated: summary.gravity_last_updated?.relative
+              ? `${summary.gravity_last_updated.relative.days}d ${summary.gravity_last_updated.relative.hours}h ago`
               : 'unknown',
-            topQueries: stats.topQueries,
-            topBlocked: stats.topBlocked,
+            topQueries: Object.entries(topItems.top_queries || {}).map(([domain, count]) => ({
+              domain,
+              count,
+            })),
+            topBlocked: Object.entries(topItems.top_ads || {}).map(([domain, count]) => ({
+              domain,
+              count,
+            })),
           };
+          // Per-instance health, only when there is more than one instance to distinguish: with a
+          // single host the old output is reproduced exactly. A failing entry is a finding, not a
+          // tool failure — `healthy` stays pod-derived and the totals still carry the good host.
+          if (getPiholeUrls().length > 1) {
+            result.instances = perInstance.map((instance) => ({
+              url: instance.url,
+              ok: instance.ok,
+              ...(instance.summary
+                ? {
+                    queriesToday: instance.summary.dns_queries_today,
+                    blockedToday: instance.summary.ads_blocked_today,
+                  }
+                : {}),
+              ...(instance.error ? { error: instance.error } : {}),
+            }));
+          }
           if (messages.length > 0) {
             result.diagnostics = messages.map((msg) => ({
               type: msg.type,
