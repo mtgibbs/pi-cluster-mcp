@@ -18,14 +18,12 @@ are those of one of two resolvers, and a secondary-only auth or health problem i
    returned by the secondary's own `POST <secondary>/api/auth`, never the primary's.
 4. A single unreachable instance does not fail the tool: the healthy ones still return stats and the
    failed one is listed in `result.stats.instancesFailed`.
-5. When **no** instance answers, `result.stats` is still present with `queriesToday` `0`,
-   `blockedToday` `0`, `instancesResponded` `0` and every configured URL listed in `instancesFailed`;
-   `result.statsError` is **not** set. This case is normative (§11) but has no dedicated `it()` block
-   or verify.sh literal — tests 4 and 5 already pin that failures are listed and healthy numbers
-   survive.
-6. With `PIHOLE_URLS` unset the totals, the queried host and the per-instance view are what they are
-   for a one-instance cluster today (`instancesTotal` 1, `instancesResponded` 1, `queriesToday` equal
-   to that instance's `queries.total`) — existing deployments are unaffected.
+5. When **no** instance answers, `getStatsInstances()` returns `queriesToday` `0`, `blockedToday` `0`,
+   `instancesResponded` `0` and `instancesFailed` listing every configured URL in config order. Pinned
+   by client-level test 8 (§11).
+6. With `PIHOLE_URLS` unset, the system queries only `PIHOLE_URL` and reports `instancesTotal` 1,
+   `instancesResponded` 1 and `queriesToday` equal to that instance's `queries.total` — existing
+   deployments are unaffected.
 
 ## 3. Entities · [E]
 
@@ -47,15 +45,15 @@ are those of one of two resolvers, and a secondary-only auth or health problem i
   `get_dns_status` calls instead of `getFullStats`. `PiholeMultiStats` extends `PiholeFullStats` and
   adds `instances: PiholeInstanceCounters[]`, `instancesTotal: number`, `instancesResponded: number`,
   `instancesFailed: string[]` (the `url`s of the failed instances, config order).
-- **Non-primary fields come from the primary** (first configured instance that answered, else the
+- **Non-summed fields come from the primary** (first configured instance that answered, else the
   first configured instance): `status`, `blockedPercentage`, `domainsBlocked`, `uniqueDomains`,
   `queriesForwarded`, `queriesCached`, `uniqueClients`, `gravityUpdated`, `topQueries`, `topBlocked`,
   `queryTypes`. Only `queriesToday` and `blockedToday` are sums. When the primary is the instance
   that failed, those non-summed fields come from the first *responding* instance; `topQueries` /
   `topBlocked` / `queryTypes` are `[]` only when **no** instance answered.
 - Per-instance session state replaces the module-level `sessionId` / `sessionExpiry` / `authInFlight`
-  globals: a map keyed by instance URL. `rateLimitedUntil` stays global — Pi-hole FTL throttles
-  logins by client IP, so one instance's 429 legitimately suppresses logins to the others too.
+  globals: a map keyed by instance URL. `rateLimitedUntil` keeps its current global scope and
+  semantics — this change neither tests nor alters it.
 - `src/tools/dns.ts` `get_dns_status` adds to `result.stats`: `instances` (array of
   `PiholeInstanceCounters`), `instancesTotal`, `instancesResponded`, `instancesFailed`. All existing
   `result.stats` keys keep their names.
@@ -106,7 +104,7 @@ the file shifts.
   `getSummary()` l.315 fetches `stats/summary` **with** auth; `getFullStats()` l.470 runs
   `getSummary` + `getTopItems` + `getQueryTypes` into `{ summary, topQueries, topBlocked, queryTypes }`.
 - `src/tools/dns.ts` — the stats block starts at the `if (includeStats && piholePods.some((p) => p.ready))`
-  gate (l.69); inside it calls `getFullStats(5)` + `getMessages()` (l.70–73) and builds
+  gate (l.68); inside it calls `getFullStats(5)` + `getMessages()` (l.70–73) and builds
   `result.stats` (l.74–92); the `catch (statsError)` (l.98) sets `result.statsError` and returns the
   pod lists. So today **any** failure in that block drops the whole stats section.
 - `src/__tests__/pihole-auth.test.ts` is the existing client-test pattern: stub `PIHOLE_URL` /
@@ -126,8 +124,9 @@ the file shifts.
   `updateGravity` exported with their current signatures; `getFullStats` and the whitelist/query/gravity
   tools keep hitting the primary (first configured instance).
 - Error text style from #44/#48 is preserved per instance: auth failures name `PIHOLE_API_TOKEN`,
-  429 stays "throttling, NOT a bad credential", and every per-instance `error` string starts with the
-  instance URL (e.g. `http://pihole-secondary.test: Pi-hole auth failed: 401 …`).
+  429 stays "throttling, NOT a bad credential", and every per-instance `error` string **contains**
+  the instance URL (e.g. `http://pihole-secondary.test: Pi-hole auth failed: 401 …`). No test pins
+  the position of the URL inside the message.
 - Tests: vitest, no network — `vi.stubGlobal('fetch', …)` plus a fresh `vi.resetModules()` import per
   test (`pihole-auth.test.ts`), and handler-level tests via `tools.find(t => t.name === …)` with
   `vi.mock('../clients/kubernetes.js', …)` for `listPods` (`summary.test.ts`, `write-tool-gates.test.ts`).
@@ -155,7 +154,7 @@ the file shifts.
 - T3: Make `get_dns_status` in `src/tools/dns.ts` call `getStatsInstances(5)` and surface
   `instances` / `instancesTotal` / `instancesResponded` / `instancesFailed`, keeping every existing
   stats key.
-- T4: Add `src/__tests__/pihole-secondary.test.ts` with the **seven** tests named in §11, using the
+- T4: Add `src/__tests__/pihole-secondary.test.ts` with the **eight** tests named in §11, using the
   exact fixtures and expected values there.
 - T5: Run `npm run lint && npm run typecheck && npm test && npm run build`, then
   `bash specs/pihole-secondary-stats-panels/verify.sh`, confirming `pihole-auth.test.ts` and
@@ -182,11 +181,10 @@ the file shifts.
   instance's `queries.total`.
 - **AC7** When `PIHOLE_URLS` lists two healthy hosts and the stats block runs once, the system shall
   make exactly 2 auth calls — one per host — never 1 (shared session) and never more than 2.
-- **AC8** If **no** configured instance answers, the system shall still return `result.stats` with
-  `queriesToday` 0, `blockedToday` 0, `instancesResponded` 0, `instancesTotal` equal to the number of
-  configured instances, `instancesFailed` listing every configured URL, and shall not set
-  `result.statsError`. This criterion is normative (§11): it is covered by the same per-instance
-  failure path that AC4/AC5 pin, not by its own `it()` block.
+- **AC8** If **no** configured instance answers, `getStatsInstances()` shall return `queriesToday` 0,
+  `blockedToday` 0, `instancesResponded` 0, `instancesTotal` equal to the number of configured
+  instances, and `instancesFailed` listing every configured URL in config order. Pinned by client-level
+  test 8.
 
 ## 11. Verification
 
@@ -201,14 +199,17 @@ the file shifts.
    `performs ONE login for a burst of concurrent requests` — fails if the refactor deletes existing
    auth tests to go green.
 4. **Machine-readable vitest run**: `npx vitest run src/__tests__/pihole-secondary.test.ts --reporter=json
-   --outputFile=…`, then a Node check on the JSON report asserting **exactly** `numPassedTests === 7`,
-   `numFailedTests === 0`, `numPendingTests === 0` and that the set of assertion titles equals the seven
+   --outputFile=…`, then a Node check on the JSON report asserting **exactly** `numPassedTests === 8`,
+   `numFailedTests === 0`, `numPendingTests === 0` and that the set of assertion titles equals the eight
    titles below (all `status: "passed"`). This cannot pass with `it.skip`, empty or removed tests, and
    does not depend on reporter text.
 5. **Pinned assertion literals**: each is a whole-line grep (anchored, whitespace-tolerant, optional
    trailing semicolon) restricted to the **body of the named test** — from its `it('<title>'` line
    until the next `it`/`test`/`describe` — so a stray substring, a commented-out assertion, or an
    assertion living in a different test cannot satisfy it.
+6. **Body-scoped fixture literals**: the six fixture strings below must each appear inside the body of
+   at least one of the eight named tests (same body-extraction rule as 5). A whole-file or
+   comment-only occurrence cannot satisfy it.
 
 Test file `src/__tests__/pihole-secondary.test.ts`. Fixtures — deliberately different per instance so
 "summed" cannot be confused with "first one wins" or "last one wins"; sids differ per host:
@@ -219,43 +220,51 @@ Test file `src/__tests__/pihole-secondary.test.ts`. Fixtures — deliberately di
 | `queries.total` | `100` | `40` | `20` |
 | `queries.blocked` | `10` | `5` | `2` |
 
-Handler-level tests stub `listPods` to return a Ready pod named `pihole-pod-a` (so the stats gate in
-`src/tools/dns.ts` opens) plus `unbound-pod-a`, and reach the handler via
-`tools.find(t => t.name === 'get_dns_status')`. Client-level tests call the exported client functions
-directly after `vi.resetModules()`.
-
 | # | Exact `it()` title | Level | Asserts (fixture → expected) | Fails when |
 |---|---|---|---|---|
-| 1 | `polls every configured Pi-hole instance` | client | `PIHOLE_URLS` = primary + secondary + third; `getAllSummaries()` → total auth calls `toHaveLength(3)`; per-host auth call buckets each `toHaveLength(1)`; per-host `stats/summary` buckets each `toHaveLength(1)` | client still queries one URL; a host is skipped (bucket length 0) |
-| 2 | `logs in to the secondary separately from the primary` | client | same 3-host config → secondary's `stats/summary` request `headers.sid` is `'sid-secondary-bbb'`, primary's is `'sid-primary-aaa'`, third's is `'sid-third-ccc'`, and primary sid `!==` secondary sid | one login reused across hosts; secondary fetched unauthenticated |
+| 1 | `polls every configured Pi-hole instance` | client | `PIHOLE_URLS` = primary + secondary + third; `getAllSummaries()` → total auth calls `toHaveLength(3)`; per-host auth-call buckets filtered by URL: `authCallsTo('http://pihole-primary.test')`, `authCallsTo('http://pihole-secondary.test')`, `authCallsTo('http://pihole-third.test')` each `toHaveLength(1)`; per-host `stats/summary` buckets each `toHaveLength(1)` | client still queries one URL; a host is skipped (bucket length 0); primary authenticated three times |
+| 2 | `logs in to the secondary separately from the primary` | client | same 3-host config → secondary's `stats/summary` request `headers.sid` is `'sid-secondary-bbb'`, primary's is `'sid-primary-aaa'`, third's is `'sid-third-ccc'` | one login reused across hosts; secondary fetched unauthenticated or with the primary's sid |
 | 3 | `sums query totals across instances and reports per-instance health` | handler | `PIHOLE_URLS` = primary + secondary → `stats.queriesToday` `toBe(140)`, `stats.blockedToday` `toBe(15)`, `stats.instances` `toHaveLength(2)`, `instances[0].queriesToday` `toBe(100)`, `instances[1].queriesToday` `toBe(40)`, `instancesResponded` `toBe(2)`, `instancesTotal` `toBe(2)`, `instancesFailed` `toHaveLength(0)` | primary-only (100/10); last-wins (40/5); aggregate-only (no per-instance counters) |
 | 4 | `reports a failed instance instead of dropping all stats` | handler | secondary `/api/auth` → 500: `instancesResponded` `toBe(1)`, `instancesTotal` `toBe(2)`, `instancesFailed` `toEqual(['http://pihole-secondary.test'])`, `instances[1].ok` `toBe(false)`, `instances[1].queriesToday` `toBe(0)`, `instances[1].error` contains `'http://pihole-secondary.test'` and is non-empty, `queriesToday` `toBe(100)` | one dead instance drops the stats block (today's `statsError` path); failure swallowed (`instancesFailed` empty, totals 140) |
 | 5 | `fails loudly for the instance whose credential is rejected, not silently` | handler | secondary `/api/auth` → 401: `instances[1].ok` `toBe(false)`, `instances[1].error` matches `/auth failed/i` **and** contains `PIHOLE_API_TOKEN`, `instances[0].ok` `toBe(true)`, `queriesToday` `toBe(100)` | rejected session swallowed to null (#44); one bad host zeroing the healthy one |
 | 6 | `logs in at most once per host under concurrent fan-out` | handler | `PIHOLE_URLS` = primary + secondary, both healthy, one `get_dns_status` call → total auth calls `toHaveLength(2)` (exactly one per host) | single-flight dropped → >2 auth calls (re-arms FTL's limiter, #48); single-flight global → 1 auth call, i.e. one host's session reused |
 | 7 | `keeps single-instance behaviour when PIHOLE_URLS is unset` | handler | only `PIHOLE_URL` = `http://pihole-primary.test` (no `PIHOLE_URLS`) → auth calls `toHaveLength(1)`, `instancesTotal` `toBe(1)`, `instancesResponded` `toBe(1)`, `queriesToday` `toBe(100)`, and no request URL contains `pihole-secondary` | `PIHOLE_URL` fallback dropped; a second host invented when none was configured |
+| 8 | `returns zeroed totals and every URL in instancesFailed when no instance answers` | client | `PIHOLE_URLS` = primary + secondary, **both** `/api/auth` → 500 → `multi.queriesToday` `toBe(0)`, `multi.blockedToday` `toBe(0)`, `multi.instancesResponded` `toBe(0)`, `multi.instancesTotal` `toBe(2)`, `multi.instancesFailed` `toEqual(['http://pihole-primary.test', 'http://pihole-secondary.test'])` | zero-instance case throws or sets `statsError` (tool drops the stats block); `instancesFailed` left empty |
 
-The **all-instances-failed** case (AC8) is a normative rule with no separate `it()` block and no
-verify.sh literal: when no configured instance answers, `getStatsInstances()` returns
-`queriesToday` 0, `blockedToday` 0, `instancesResponded` 0 and `instancesFailed` listing every
-configured URL, and `get_dns_status` keeps the `stats` block instead of setting `statsError`. It is
-stated here rather than gated because the tool-level behaviour is already pinned by tests 4 and 5
-(failure entries listed, healthy numbers preserved) and a zero-instance case adds no new assertion
-the two do not already imply.
+Handler-level tests stub `../clients/kubernetes.js` (`vi.mock`) so `listPods` resolves a Ready pod
+named `pihole-pod-a` plus `unbound-pod-a` (opening the `includeStats` gate), stub global `fetch`, and
+reach the handler via `tools.find(t => t.name === 'get_dns_status')`. Client-level tests (1, 2, 8)
+call the exported client functions directly after `vi.resetModules()`. `authCallsTo(url)` is a local
+helper in the test file that counts recorded `POST <url>/api/auth` calls; the pinned literals below
+name it with the concrete fixture URL, so each per-host bucket is gated.
 
 The literals verify.sh pins, each as a whole line that must appear inside the body of the named test
-(so a passing test cannot borrow another test's assertion):
+(so a passing test cannot borrow another test's assertion, and a comment outside a test body cannot
+satisfy a fixture pin):
 
-- test 1: `expect(authCalls).toHaveLength(3)`
+- test 1: `expect(authCalls).toHaveLength(3)` · `expect(authCallsTo('http://pihole-primary.test')).toHaveLength(1)` ·
+  `expect(authCallsTo('http://pihole-secondary.test')).toHaveLength(1)` ·
+  `expect(authCallsTo('http://pihole-third.test')).toHaveLength(1)`
+- test 2: `expect(secondarySid).toBe('sid-secondary-bbb')` · `expect(primarySid).toBe('sid-primary-aaa')` ·
+  `expect(thirdSid).toBe('sid-third-ccc')` (each variable read from the corresponding host's recorded
+  `stats/summary` request `headers.sid`)
 - test 3: `expect(stats.queriesToday).toBe(140)` · `expect(stats.blockedToday).toBe(15)` ·
-  `expect(stats.instances).toHaveLength(2)`
+  `expect(stats.instances).toHaveLength(2)` · `expect(stats.instances[0].queriesToday).toBe(100)` ·
+  `expect(stats.instances[1].queriesToday).toBe(40)`
 - test 4: `expect(stats.instancesFailed).toEqual(['http://pihole-secondary.test'])` ·
-  `expect(stats.instancesResponded).toBe(1)` · `expect(stats.instances[1].queriesToday).toBe(0)`
+  `expect(stats.instancesResponded).toBe(1)` · `expect(stats.instances[1].ok).toBe(false)` ·
+  `expect(stats.instances[1].queriesToday).toBe(0)` · `expect(stats.queriesToday).toBe(100)` ·
+  `expect(stats.instances[1].error).toContain('http://pihole-secondary.test')`
 - test 5: `expect(stats.instances[1].error).toMatch(/auth failed/i)` ·
-  `expect(stats.instances[1].error).toContain('PIHOLE_API_TOKEN')`
+  `expect(stats.instances[1].error).toContain('PIHOLE_API_TOKEN')` · `expect(stats.queriesToday).toBe(100)`
 - test 6: `expect(authCalls).toHaveLength(2)`
-- test 7: `expect(stats.instancesTotal).toBe(1)`
-- fixtures: `sid-primary-aaa`, `sid-secondary-bbb`, `sid-third-ccc`, `http://pihole-primary.test`,
-  `http://pihole-secondary.test`, `http://pihole-third.test`
+- test 7: `expect(stats.instancesTotal).toBe(1)` · `expect(stats.queriesToday).toBe(100)` ·
+  `expect(authCalls).toHaveLength(1)`
+- test 8: `expect(multi.queriesToday).toBe(0)` · `expect(multi.instancesResponded).toBe(0)` ·
+  `expect(multi.instancesFailed).toEqual(['http://pihole-primary.test', 'http://pihole-secondary.test'])`
+- fixture strings (each must appear inside at least one test body): `sid-primary-aaa`,
+  `sid-secondary-bbb`, `sid-third-ccc`, `http://pihole-primary.test`, `http://pihole-secondary.test`,
+  `http://pihole-third.test`
 
 `verify.sh` does **not** grep `k8s/` — manifests are out of scope (§4).
 
