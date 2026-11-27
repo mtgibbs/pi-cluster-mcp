@@ -80,37 +80,6 @@ This project is built with a "defense in depth" approach:
 | `MEALIE_PUBLIC_URL` | Public base URL for recipe links | No (default: recipes.lab.mtgibbs.dev) |
 | `MEALIE_GROUP_SLUG` | Group slug used in recipe web links | No (default: home) |
 
-### Multi-instance Pi-hole
-
-`get_dns_status` polls every Pi-hole instance in the cluster and reports cluster-wide totals, so a
-query blocked on the secondary is never missing from "DNS status" again.
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PIHOLE_URL` | The primary Pi-hole: source of the non-summed stats (top domains, clients, gravity) and the instance the write tools target | Yes |
-| `PIHOLE_URLS` | Comma-separated list of **all** instances to poll (primary and secondary alike, no duplicates). Empty entries are ignored; if unset or it holds no usable entry the server falls back to `PIHOLE_URL` alone | No (default: `PIHOLE_URL` only) |
-| `PIHOLE_API_TOKEN` | API token used for every instance. Because the instances are exact replicas, each carries the same `API_GATEWAY_PASSWORD`, so this is a single value shared by all of them | Yes (for DNS tools) |
-
-Example:
-
-```
-PIHOLE_URL=https://pi.hole.tailnet.ts.net
-PIHOLE_URLS=https://pi.hole.tailnet.ts.net,https://pi.hole2.tailnet.ts.net
-PIHOLE_API_TOKEN=<API_GATEWAY_PASSWORD, identical on both instances>
-```
-
-Behaviour:
-
-- `queriesToday` / `blockedToday` are summed across instances; `percentBlocked`, `top_blocked_domains`,
-  `active_clients`, `gravity_last_update`, `gravity_count` and `uptime` come from the primary.
-- `instanceStats` lists every configured instance with its own counters and `ok`/`error`, and
-  `instancesResponded` / `instancesTotal` / `instancesFailed` make partial visibility explicit rather
-  than silently under-counting.
-- An instance that cannot be reached or that rejects its credentials degrades to an
-  `instancesFailed` entry — the rest of the cluster is still reported. The only hard failure is the
-  primary itself being unreachable, which is reported as `statsError`.
-- The DNS **write** tools (`update_pihole_gravity`, whitelist, blocklist) remain primary-only.
-
 ## 📦 Deployment
 
 ### Local Development (Stdio)
@@ -147,7 +116,7 @@ The server is designed to be deployed as a Pod in your cluster.
 | Category | Tools |
 |----------|-------|
 | **Cluster** | `get_cluster_health`, `restart_deployment` |
-| **DNS** | `get_dns_status`, `test_dns_query`, `update_pihole_gravity`, `get_pihole_whitelist`, `get_pihole_queries`. `get_dns_status` polls every instance in `PIHOLE_URLS` and sums the counters. |
+| **DNS** | `get_dns_status`, `test_dns_query`, `update_pihole_gravity`, `get_pihole_whitelist`, `get_pihole_queries` |
 | **GitOps** | `get_flux_status`, `reconcile_flux` |
 | **Media** | `get_media_status`, `fix_jellyfin_metadata` |
 | **Subtitles** | `get_subtitle_status`, `get_subtitle_history`, `search_subtitles` |
