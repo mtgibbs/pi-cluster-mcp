@@ -1,6 +1,6 @@
 import type { Tool } from './index.js';
 import { listPods, execInPod, getReadyPod, readPodLog } from '../clients/kubernetes.js';
-import { getFullStats, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
+import { getStatsInstances, getMessages, updateGravity, getWhitelist, getRecentQueries } from '../clients/pihole.js';
 import { k8sError, notFoundError, rateLimitedError } from '../utils/errors.js';
 
 const PIHOLE_NAMESPACE = 'pihole';
@@ -68,10 +68,12 @@ const getDnsStatus: Tool = {
       if (includeStats && piholePods.some((p) => p.ready)) {
         try {
           const [stats, messages] = await Promise.all([
-            getFullStats(5),
+            getStatsInstances(5),
             getMessages(),
           ]);
           result.stats = {
+            // Summed across the instances that answered; `instancesResponded` / `instancesTotal`
+            // say how many hosts the totals cover.
             status: stats.summary.status,
             queriesToday: stats.summary.dns_queries_today,
             blockedToday: stats.summary.ads_blocked_today,
@@ -86,6 +88,12 @@ const getDnsStatus: Tool = {
               : 'unknown',
             topQueries: stats.topQueries,
             topBlocked: stats.topBlocked,
+            // Per-instance health, so one dead resolver is visible instead of silently
+            // contributing nothing to the totals (pi-cluster-mcp#45).
+            instances: stats.instances,
+            instancesTotal: stats.instancesTotal,
+            instancesResponded: stats.instancesResponded,
+            instancesFailed: stats.instancesFailed,
           };
           if (messages.length > 0) {
             result.diagnostics = messages.map((msg) => ({
