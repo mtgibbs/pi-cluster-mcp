@@ -393,8 +393,9 @@ function fetchSummaryStats(url: string): Promise<StatsResponse> {
  *
  * `expiresImmediately` is what `getAllSummaries()` passes: that fan-out wants one request per host
  * per run, so its promise must not stay in the map for a later phase of the same run to reuse.
- * Callers that want the reuse keep the default one-second window, which is long enough to cover a
- * burst of parallel callers and short enough that a periodic poll always re-reads live numbers.
+ * Callers that want the reuse keep the default, which shares a single request with everything else
+ * launched while it is still in flight; the entry is dropped as soon as it settles, so the next
+ * poll always re-reads live numbers.
  */
 export async function getSummary(
   url: string = getPrimaryUrl(),
